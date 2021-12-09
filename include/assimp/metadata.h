@@ -84,6 +84,33 @@ typedef enum aiMetadataType {
 struct aiMetadataEntry {
     aiMetadataType mType;
     void* mData;
+
+    friend std::ostream& operator <<(std::ostream& output, const aiMetadataEntry& me) {
+        switch (me.mType) {
+        case AI_BOOL:
+            output << *static_cast<bool*>(me.mData) ? "true" : "false";
+            break;
+        case AI_INT32:
+            output << *static_cast<int32_t*>(me.mData);
+            break;
+        case AI_UINT64:
+            output << *static_cast<uint64_t*>(me.mData);
+            break;
+        case AI_FLOAT:
+            output << *static_cast<float*>(me.mData);
+            break;
+        case AI_DOUBLE:
+            output << *static_cast<double*>(me.mData);
+            break;
+        case AI_AISTRING:
+            output << static_cast<aiString*>(me.mData);
+            break;
+        case AI_AIVECTOR3D:
+            auto vec = static_cast<aiVector3D*>(me.mData);
+            output << "{ x:" << vec->x << ", y:" << vec->y << ", z: " << vec->z << "}";
+        }
+        return output;
+    }
 };
 
 #ifdef __cplusplus

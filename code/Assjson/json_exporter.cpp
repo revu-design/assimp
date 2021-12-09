@@ -438,6 +438,15 @@ void Write(JSONWriter& out, const aiNode& ai, bool is_elem = true) {
         out.EndArray();
     }
 
+        if (ai.mMetaData) {
+            out.Key("__metadata__");
+            out.StartObj();
+            for (unsigned int n = 0; n < ai.mMetaData->mNumProperties; ++n) {
+                out.Key(ai.mMetaData->mKeys[n].C_Str());
+                out.SimpleValue(ai.mMetaData->mValues[n]);
+            }
+            out.EndObj();
+        }
     out.EndObj();
 }
 
