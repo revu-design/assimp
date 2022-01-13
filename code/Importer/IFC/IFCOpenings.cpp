@@ -1574,7 +1574,7 @@ namespace Assimp {
                     auto vn = v0;
                     for (auto vI = vI0 + 1; vI < vI0 + nVertices; vI++) {
                         auto vp = vn;
-                        auto vn = planeSpace * mesh->mVerts[vI];
+                        vn = planeSpace * mesh->mVerts[vI];
                         IfcVector3 intersection;
 
                         if (std::fabsf(vn.z - planeOffset) < close) {
@@ -1602,6 +1602,7 @@ namespace Assimp {
                                 auto s = std::pair<IfcVector2, IfcVector2>(firstPoint, secondPoint);
                                 logSegment(s);
                                 lineSegments.push_back(s);
+                                // next firstpoint should be this one
                             }
                             else {
                                 // store the first intersection point
