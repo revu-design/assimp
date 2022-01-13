@@ -58,6 +58,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #include <iterator>
+#include <forward_list>
+#include <deque>
 
 namespace Assimp {
     namespace IFC {
@@ -1488,15 +1490,232 @@ namespace Assimp {
             return contour;
         }
 
+        const float close = 1e-6;
+
+        static bool isClose(IfcVector2 first, IfcVector2 second) {
+            auto diff = (second - first);
+            return (std::fabsf(diff.x) < close && std::fabsf(diff.y) < close);
+        }
+
+        static void logSegment(std::pair<IfcVector2, IfcVector2> segment) {
+            std::stringstream msg2;
+            msg2 << " Segment: \n";
+            msg2 << "   " << segment.first.x << " " << segment.first.y << " \n";
+            msg2 << "   " << segment.second.x << " " << segment.second.y << " \n";
+            IFCImporter::LogInfo(msg2.str().c_str());
+        }
+
+        static void logVector(std::string name, IfcVector3 vec) {
+            std::stringstream msg2;
+            msg2 << name << ": ";
+            msg2 << "   " << vec.x << " " << vec.y << " " << vec.z << " \n";
+            IFCImporter::LogInfo(msg2.str().c_str());
+        }
+
         std::vector<std::vector<IfcVector2>> GetContoursInPlane3D(std::shared_ptr<TempMesh> mesh, IfcMatrix3 planeSpace,
             IfcVector3 planeNor, IfcFloat planeOffset,
-            IfcVector3 extrusionDir, IfcVector3& wall_extrusion, bool& first, bool& ok) {
+            IfcVector3 extrusionDir, IfcVector3& wall_extrusion, bool& first) {
 
-            // find the lines giving the intersection of the faces with the plane.
-            unsigned int vertexI = 0; // type matched to mVertcnt
-            for (auto nVertices : mesh->mVertcnt) { // iterate over faces
-                mesh->mVertcnt =
-            }
+                {
+                    std::stringstream msg;
+                    msg << "GetContoursInPlane3D: planeSpace is \n";
+                    msg << planeSpace.a1 << " " << planeSpace.a2 << " " << planeSpace.a3 << " " << "\n";
+                    msg << planeSpace.b1 << " " << planeSpace.b2 << " " << planeSpace.b3 << " " << "\n";
+                    msg << planeSpace.c1 << " " << planeSpace.c2 << " " << planeSpace.c3 << " " << "\n";
+                    msg << "\n planeOffset is " << planeOffset;
+                    IFCImporter::LogInfo(msg.str().c_str());
+                }
+
+                // we'll put our line segments in here, and then merge them together into contours later
+                std::deque<std::pair<IfcVector2, IfcVector2>> lineSegments;
+
+                // find the lines giving the intersection of the faces with the plane - we'll work in planeSpace throughout.
+                size_t vI0{ 0 }; // vertex index for first vertex in plane
+                for (auto nVertices : mesh->mVertcnt) { // iterate over faces
+                    {
+                        std::stringstream msg;
+                        msg << "GetContoursInPlane3D: face (transformed) is  \n";
+                        for (auto vI = vI0; vI < vI0 + nVertices; vI++) {
+                            auto v = planeSpace * mesh->mVerts[vI];
+                            msg << "   " << v.x << " " << v.y << " " << v.z << " " << "\n";
+                        }
+                        IFCImporter::LogInfo(msg.str().c_str());
+                    }
+
+                    if (nVertices <= 2) // not a plane, a point or line
+                    {
+                        std::stringstream msg;
+                        msg << "GetContoursInPlane3D: found point or line when expecting plane (only " << nVertices << " vertices)";
+                        IFCImporter::LogWarn(msg.str().c_str());
+                        vI0 += nVertices;
+                        continue;
+                    }
+
+                    // assuming the vertices are all in a plane (let's hope so!) we can get the intersection
+                    // vector between the planes
+                    auto v0 = planeSpace * mesh->mVerts[vI0];
+                    auto v1 = planeSpace * mesh->mVerts[vI0 + 1];
+                    auto v2 = planeSpace * mesh->mVerts[vI0 + 2];
+
+                    auto faceNor = ((v1 - v0) ^ (v2 - v0)).Normalize();
+                    auto intersectionDir = faceNor ^ IfcVector3(0.f, 0.f, 1.f); // as we're in plane space, plane normal is (0,0,1)
+
+                    // now calculate intersections between face and plane
+                    IfcVector2 firstPoint;
+                    bool gotFirstPoint(false);
+
+                    if (std::fabsf(v0.z - planeOffset) < close) {
+                        // first point is on the plane
+                        firstPoint.x = v0.x;
+                        firstPoint.y = v0.y;
+                        gotFirstPoint = true;
+                    }
+
+                    auto vn = v0;
+                    for (auto vI = vI0 + 1; vI < vI0 + nVertices; vI++) {
+                        auto vp = vn;
+                        auto vn = planeSpace * mesh->mVerts[vI];
+                        IfcVector3 intersection;
+
+                        if (std::fabsf(vn.z - planeOffset) < close) {
+                            // on the plane
+                            intersection = vn;
+                        }
+                        else if ((vn.z > planeOffset) != (vp.z > planeOffset))
+                        {
+                            // passes through the plane
+                            auto vdir = vn - vp;
+                            auto scale = (planeOffset - vp.z) / vdir.z;
+                            intersection = vp + scale * vdir;
+                        }
+                        else {
+                            // nowhere near - move on
+                            continue;
+                        }
+
+                        if (!gotFirstPoint) {
+                            if (std::fabsf(vp.z - planeOffset) < close) {
+                                // just had a second line along the plane
+                                firstPoint.x = vp.x;
+                                firstPoint.y = vp.y;
+                                IfcVector2 secondPoint(intersection.x, intersection.y);
+                                auto s = std::pair<IfcVector2, IfcVector2>(firstPoint, secondPoint);
+                                logSegment(s);
+                                lineSegments.push_back(s);
+                            }
+                            else {
+                                // store the first intersection point
+                                firstPoint.x = intersection.x;
+                                firstPoint.y = intersection.y;
+                                gotFirstPoint = true;
+                            }
+                        }
+                        else {
+                            // now got the second point, so store the pair
+                            IfcVector2 secondPoint(intersection.x, intersection.y);
+                            auto s = std::pair<IfcVector2, IfcVector2>(firstPoint, secondPoint);
+                            logSegment(s);
+                            lineSegments.push_back(s);
+
+                            // - note that we don't move onto the next face as a non-convex face can create two or more intersections with a plane
+                            gotFirstPoint = false;
+                        }
+                    }
+                    if (gotFirstPoint) {
+                        IFCImporter::LogWarn("GetContoursInPlane3D: odd number of intersections with plane");
+                    }
+                    vI0 += nVertices;
+                }
+
+                {
+                    std::stringstream msg;
+                    msg << "GetContoursInPlane3D: found " << lineSegments.size() << " line segments:\n";
+                    IFCImporter::LogInfo(msg.str().c_str());
+
+                    for (auto& s : lineSegments) {
+                        logSegment(s);
+                    }
+
+                }
+
+                // now merge contours until we have the best-looking polygons we can
+                std::vector<Contour> contours;
+                while (!lineSegments.empty()) {
+                    // start with a polygon and make the best closed contour we can
+                    const auto& firstSeg = lineSegments.front();
+                    std::deque<IfcVector2> contour{ firstSeg.first, firstSeg.second };
+                    lineSegments.pop_front();
+                    bool foundNextPoint{ true };
+                    bool closedContour{ false };
+                    while (foundNextPoint) {
+                        foundNextPoint = false;
+                        for (auto nextSeg = lineSegments.begin(); nextSeg != lineSegments.end(); nextSeg++) {
+                            // see if we can match up both ends - in which case we've closed the contour
+                            if (isClose(contour.front(), nextSeg->first) && isClose(contour.back(), nextSeg->second) ||
+                                isClose(contour.back(), nextSeg->first) && isClose(contour.front(), nextSeg->second)
+                                ) {
+                                lineSegments.erase(nextSeg);
+                                closedContour = true;
+                                break;
+                            }
+
+                            // otherwise, see if we can match up either end
+                            foundNextPoint = true;
+                            if (isClose(contour.front(), nextSeg->first)) {
+                                contour.push_front(nextSeg->second);
+                            }
+                            else if (isClose(contour.front(), nextSeg->second)) {
+                                contour.push_front(nextSeg->first);
+                            }
+                            else if (isClose(contour.back(), nextSeg->first)) {
+                                contour.push_back(nextSeg->second);
+                            }
+                            else if (isClose(contour.back(), nextSeg->second)) {
+                                contour.push_back(nextSeg->first);
+                            }
+                            else {
+                                foundNextPoint = false;
+                            }
+                            if (foundNextPoint) {
+                                lineSegments.erase(nextSeg);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!closedContour) {
+                        IFCImporter::LogWarn("GetContoursInPlane3D: did not close contour");
+                    }
+
+                    // now add the contour if we can
+                    if (contour.size() <= 2) {
+                        IFCImporter::LogWarn("GetContoursInPlane3D: discarding line/point contour");
+                        continue;
+                    }
+                    Contour c{};
+                    for (auto p : contour)
+                    {
+                        c.push_back(p);
+                    }
+                    contours.push_back(c);
+                }
+
+                {
+                    std::stringstream msg;
+                    msg << "GetContoursInPlane3D: found " << contours.size() << " contours:\n";
+
+                    for (auto c : contours) {
+                        msg << " Contour: \n";
+                        for (auto p : c) {
+                            msg << "   " << p.x << " " << p.y << " \n";
+                        }
+                    }
+
+                    IFCImporter::LogInfo(msg.str().c_str());
+                }
+
+
+                return contours;
         }
 
         std::vector<std::vector<IfcVector2>> GetContoursInPlane(std::shared_ptr<TempMesh> mesh, IfcMatrix3 planeSpace,
