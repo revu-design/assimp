@@ -91,33 +91,6 @@ namespace Assimp {
         }
 
         // ------------------------------------------------------------------------------------------------
-        bool ProcessPolylineAsLoop(const Schema_2x3::IfcPolyline& line, TempMesh& meshout, ConversionData& /*conv*/)
-        {
-            // treat line as a loop
-            size_t cnt = 0;
-            for (const Schema_2x3::IfcCartesianPoint& c : line.Points) {
-                IfcVector3 tmp;
-                ConvertCartesianPoint(tmp, c);
-
-                meshout.mVerts.push_back(tmp);
-                ++cnt;
-            }
-
-            meshout.mVertcnt.push_back(static_cast<unsigned int>(cnt));
-
-            // zero- or one- vertex polyloops simply ignored
-            if (meshout.mVertcnt.back() > 1) {
-                return true;
-            }
-
-            if (meshout.mVertcnt.back() == 1) {
-                meshout.mVertcnt.pop_back();
-                meshout.mVerts.pop_back();
-            }
-            return false;
-        }
-
-        // ------------------------------------------------------------------------------------------------
         void ProcessPolygonBoundaries(TempMesh& result, const TempMesh& inmesh, size_t master_bounds = (size_t)-1)
         {
             // handle all trivial cases
@@ -853,24 +826,6 @@ namespace Assimp {
             }
             else  if (const Schema_2x3::IfcBooleanResult* boolean = geo.ToPtr<Schema_2x3::IfcBooleanResult>()) {
                 ProcessBoolean(*boolean, *meshtmp.get(), conv);
-            }
-            else if (const Schema_2x3::IfcPolyline* polyline = geo.ToPtr<Schema_2x3::IfcPolyline>()) {
-                TempMesh meshout;
-                if (!areClose(polyline->Points.front(), polyline->Points.back()))
-                {
-                    std::stringstream toLog;
-                    toLog << "Unable to treating Polyline as loop, because first and last points do not match. (Entity id " << polyline->GetID() << ") - skipping";
-                    IFCImporter::LogWarn(toLog.str().c_str());
-                    return false;
-                }
-                else {
-                    std::stringstream toLog;
-                    toLog << "Treating Polyline as loop, because first and last points match. (Entity id " << polyline->GetID() << ") - skipping";
-                    IFCImporter::LogInfo(toLog.str().c_str());
-                }
-                ProcessPolylineAsLoop(*polyline, meshout, conv);
-                ProcessPolygonBoundaries(*meshtmp.get(), meshout);
-                fix_orientation = true;
             }
             else if (geo.ToPtr<Schema_2x3::IfcBoundingBox>()) {
                 // silently skip over bounding boxes
