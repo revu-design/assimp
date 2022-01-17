@@ -556,6 +556,32 @@ namespace Assimp {
             return m;
         }
 
+        const auto closeDistance = 1e-6;
+
+        bool areClose(Schema_2x3::IfcCartesianPoint pt1, Schema_2x3::IfcCartesianPoint pt2) {
+            if (pt1.Coordinates.size() != pt2.Coordinates.size())
+            {
+                IFCImporter::LogWarn("unable to compare differently-dimensioned points");
+                return false;
+            }
+            auto coord1 = pt1.Coordinates.begin();
+            auto coord2 = pt2.Coordinates.begin();
+            // we're just testing each dimension separately rather than doing euclidean distance, as we're
+            // looking for very close coordinates
+            for (; coord1 != pt1.Coordinates.end(); coord1++, coord2++)
+            {
+                if (std::fabs(*coord1 - *coord2) > closeDistance)
+                    return false;
+            }
+            return true;
+        }
+
+        bool areClose(IfcVector3 pt1, IfcVector3 pt2) {
+            return (std::fabs(pt1.x - pt2.x) < closeDistance &&
+                std::fabs(pt1.y - pt2.y) < closeDistance &&
+                std::fabs(pt1.z - pt2.z) < closeDistance);
+        }
+
         // Extrudes the given polygon along the direction, converts it into an opening or applies all openings as necessary.
         void ProcessExtrudedArea(const Schema_2x3::IfcExtrudedAreaSolid& solid, const TempMesh& curve,
             const IfcVector3& extrusionDir, TempMesh& result, ConversionData& conv, bool collect_openings)
@@ -619,16 +645,21 @@ namespace Assimp {
                         nors.push_back(IfcVector3());
                         continue;
                     }
-
+                    auto nor = ((bounds.mVerts[2] - bounds.mVerts[0]) ^ (bounds.mVerts[1] - bounds.mVerts[0])).Normalize();
+                    auto vI0 = bounds.mVertcnt[0];
+                    for (size_t faceI = 0; faceI < bounds.mVertcnt.size(); faceI++)
                     {
-                        std::stringstream msg;
-                        msg << "Generating normal from first 3 of these " << bounds.mVerts.size() << " vertices: \n";
-                        for (auto& const vert : bounds.mVerts) {
-                            msg << " (" << vert.x << ", " << vert.y << ", " << vert.z << ") \n";
+                        if (bounds.mVertcnt[faceI] >= 3) {
+                            // do a check that this is at least parallel to the base plane
+                            auto nor2 = ((bounds.mVerts[vI0 + 2] - bounds.mVerts[vI0]) ^ (bounds.mVerts[vI0 + 1] - bounds.mVerts[vI0])).Normalize();
+                            if (!areClose(nor, nor2)) {
+                                std::stringstream msg;
+                                msg << "Face " << faceI << " is not parallel with face 0 - opening on entity " << solid.GetID();
+                                IFCImporter::LogWarn(msg.str().c_str());
+                            }
                         }
-                        IFCImporter::LogDebug(msg.str().c_str());
                     }
-                    nors.push_back(((bounds.mVerts[2] - bounds.mVerts[0]) ^ (bounds.mVerts[1] - bounds.mVerts[0])).Normalize());
+                    nors.push_back(nor);
                 }
             }
 
@@ -637,6 +668,7 @@ namespace Assimp {
             TempMesh& curmesh = openings ? temp : result;
             std::vector<IfcVector3>& out = curmesh.mVerts;
 
+            IFCImporter::LogInfo("Creating openings");
             size_t sides_with_openings = 0;
             for (size_t i = 0; i < in.size(); ++i) {
                 const size_t next = (i + 1) % in.size();
@@ -650,6 +682,7 @@ namespace Assimp {
 
                 if (openings) {
                     if ((in[i] - in[next]).Length() > diag * 0.1 && GenerateOpenings(*conv.apply_openings, nors, temp, true, true, dir)) {
+                        IFCImporter::LogInfo("Added side with openings");
                         ++sides_with_openings;
                     }
 
@@ -777,6 +810,7 @@ namespace Assimp {
             }
         }
 
+
         // ------------------------------------------------------------------------------------------------
         bool ProcessGeometricItem(const Schema_2x3::IfcRepresentationItem& geo, unsigned int matid, std::set<unsigned int>& mesh_indices,
             ConversionData& conv)
@@ -820,12 +854,24 @@ namespace Assimp {
             else  if (const Schema_2x3::IfcBooleanResult* boolean = geo.ToPtr<Schema_2x3::IfcBooleanResult>()) {
                 ProcessBoolean(*boolean, *meshtmp.get(), conv);
             }
-            /*else if (const Schema_2x3::IfcPolyline* polyline = geo.ToPtr<Schema_2x3::IfcPolyline>()) {
+            else if (const Schema_2x3::IfcPolyline* polyline = geo.ToPtr<Schema_2x3::IfcPolyline>()) {
                 TempMesh meshout;
+                if (!areClose(polyline->Points.front(), polyline->Points.back()))
+                {
+                    std::stringstream toLog;
+                    toLog << "Unable to treating Polyline as loop, because first and last points do not match. (Entity id " << polyline->GetID() << ") - skipping";
+                    IFCImporter::LogWarn(toLog.str().c_str());
+                    return false;
+                }
+                else {
+                    std::stringstream toLog;
+                    toLog << "Treating Polyline as loop, because first and last points match. (Entity id " << polyline->GetID() << ") - skipping";
+                    IFCImporter::LogInfo(toLog.str().c_str());
+                }
                 ProcessPolylineAsLoop(*polyline, meshout, conv);
                 ProcessPolygonBoundaries(*meshtmp.get(), meshout);
                 fix_orientation = true;
-            } */
+            }
             else if (geo.ToPtr<Schema_2x3::IfcBoundingBox>()) {
                 // silently skip over bounding boxes
                 return false;

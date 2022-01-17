@@ -475,6 +475,19 @@ namespace Assimp {
             // This should yield only one polygon or something went wrong
             if (clipped.size() != 1) {
 
+                {
+                    std::stringstream msg;
+                    msg << "Got more than one polygon from window union :\n";
+                    size_t polyI = 0;
+                    for (auto poly : clipped) {
+                        msg << "- Poly " << polyI << ":\n";
+                        for (auto pt : poly.outer) {
+                            msg << "    " << pt.X << " , " << pt.Y << "\n";
+                        }
+                    }
+                    IFCImporter::LogError(msg.str().c_str());
+                }
+
                 // Empty polygon? drop the contour altogether
                 if (clipped.empty()) {
                     IFCImporter::LogError("error during polygon clipping, window contour is degenerate");
@@ -1312,6 +1325,7 @@ namespace Assimp {
                 // Skip over very small openings - these are likely projection errors
                 // (i.e. they don't belong to this side of the wall)
                 if (std::fabs(vpmax.x - vpmin.x) * std::fabs(vpmax.y - vpmin.y) < static_cast<IfcFloat>(1e-10)) {
+                    IFCImporter::LogDebug("Skipping tiny opening");
                     continue;
                 }
                 std::vector<TempOpening*> joined_openings(1, &opening);
