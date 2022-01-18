@@ -43,7 +43,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *  @brief Implementation of the DXF importer class
  */
 
-
 #ifndef ASSIMP_BUILD_NO_DXF_IMPORTER
 
 #include "AssetLib/DXF/DXFLoader.h"
@@ -52,9 +51,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <assimp/ParsingUtils.h>
 #include <assimp/fast_atof.h>
-#include <assimp/IOSystem.hpp>
-#include <assimp/scene.h>
 #include <assimp/importerdesc.h>
+#include <assimp/scene.h>
+#include <assimp/IOSystem.hpp>
 
 #include <numeric>
 
@@ -70,27 +69,27 @@ static const aiColor4D AI_DXF_DEFAULT_COLOR(aiColor4D(0.6f, 0.6f, 0.6f, 0.6f));
 // color indices for DXF - 16 are supported, the table is
 // taken directly from the DXF spec.
 static aiColor4D g_aclrDxfIndexColors[] = {
-    aiColor4D (0.6f, 0.6f, 0.6f, 1.0f),
-    aiColor4D (1.0f, 0.0f, 0.0f, 1.0f), // red
-    aiColor4D (0.0f, 1.0f, 0.0f, 1.0f), // green
-    aiColor4D (0.0f, 0.0f, 1.0f, 1.0f), // blue
-    aiColor4D (0.3f, 1.0f, 0.3f, 1.0f), // light green
-    aiColor4D (0.3f, 0.3f, 1.0f, 1.0f), // light blue
-    aiColor4D (1.0f, 0.3f, 0.3f, 1.0f), // light red
-    aiColor4D (1.0f, 0.0f, 1.0f, 1.0f), // pink
-    aiColor4D (1.0f, 0.6f, 0.0f, 1.0f), // orange
-    aiColor4D (0.6f, 0.3f, 0.0f, 1.0f), // dark orange
-    aiColor4D (1.0f, 1.0f, 0.0f, 1.0f), // yellow
-    aiColor4D (0.3f, 0.3f, 0.3f, 1.0f), // dark gray
-    aiColor4D (0.8f, 0.8f, 0.8f, 1.0f), // light gray
-    aiColor4D (0.0f, 00.f, 0.0f, 1.0f), // black
-    aiColor4D (1.0f, 1.0f, 1.0f, 1.0f), // white
-    aiColor4D (0.6f, 0.0f, 1.0f, 1.0f)  // violet
+    aiColor4D(0.6f, 0.6f, 0.6f, 1.0f),
+    aiColor4D(1.0f, 0.0f, 0.0f, 1.0f), // red
+    aiColor4D(0.0f, 1.0f, 0.0f, 1.0f), // green
+    aiColor4D(0.0f, 0.0f, 1.0f, 1.0f), // blue
+    aiColor4D(0.3f, 1.0f, 0.3f, 1.0f), // light green
+    aiColor4D(0.3f, 0.3f, 1.0f, 1.0f), // light blue
+    aiColor4D(1.0f, 0.3f, 0.3f, 1.0f), // light red
+    aiColor4D(1.0f, 0.0f, 1.0f, 1.0f), // pink
+    aiColor4D(1.0f, 0.6f, 0.0f, 1.0f), // orange
+    aiColor4D(0.6f, 0.3f, 0.0f, 1.0f), // dark orange
+    aiColor4D(1.0f, 1.0f, 0.0f, 1.0f), // yellow
+    aiColor4D(0.3f, 0.3f, 0.3f, 1.0f), // dark gray
+    aiColor4D(0.8f, 0.8f, 0.8f, 1.0f), // light gray
+    aiColor4D(0.0f, 00.f, 0.0f, 1.0f), // black
+    aiColor4D(1.0f, 1.0f, 1.0f, 1.0f), // white
+    aiColor4D(0.6f, 0.0f, 1.0f, 1.0f) // violet
 };
-#define AI_DXF_NUM_INDEX_COLORS (sizeof(g_aclrDxfIndexColors)/sizeof(g_aclrDxfIndexColors[0]))
+#define AI_DXF_NUM_INDEX_COLORS (sizeof(g_aclrDxfIndexColors) / sizeof(g_aclrDxfIndexColors[0]))
 #define AI_DXF_ENTITIES_MAGIC_BLOCK "$ASSIMP_ENTITIES_MAGIC"
 
-static const int GroupCode_Name  = 2;
+static const int GroupCode_Name = 2;
 static const int GroupCode_XComp = 10;
 static const int GroupCode_YComp = 20;
 static const int GroupCode_ZComp = 30;
@@ -110,8 +109,8 @@ static const aiImporterDesc desc = {
 
 // ------------------------------------------------------------------------------------------------
 // Constructor to be privately used by Importer
-DXFImporter::DXFImporter()
-: BaseImporter() {
+DXFImporter::DXFImporter() :
+        BaseImporter() {
     // empty
 }
 
@@ -123,15 +122,15 @@ DXFImporter::~DXFImporter() {
 
 // ------------------------------------------------------------------------------------------------
 // Returns whether the class can handle the format of the given file.
-bool DXFImporter::CanRead( const std::string& filename, IOSystem* pIOHandler, bool checkSig ) const {
-    const std::string& extension = GetExtension( filename );
-    if ( extension == desc.mFileExtensions ) {
+bool DXFImporter::CanRead(const std::string &filename, IOSystem *pIOHandler, bool checkSig) const {
+    const std::string &extension = GetExtension(filename);
+    if (extension == desc.mFileExtensions) {
         return true;
     }
 
-    if ( extension.empty() || checkSig ) {
-        static const char * const pTokens[] = { "SECTION", "HEADER", "ENDSEC", "BLOCKS" };
-        return SearchFileHeaderForToken(pIOHandler, filename, pTokens, 4, 32 );
+    if (extension.empty() || checkSig) {
+        static const char *const pTokens[] = { "SECTION", "HEADER", "ENDSEC", "BLOCKS" };
+        return SearchFileHeaderForToken(pIOHandler, filename, pTokens, 4, 32);
     }
 
     return false;
@@ -139,62 +138,62 @@ bool DXFImporter::CanRead( const std::string& filename, IOSystem* pIOHandler, bo
 
 // ------------------------------------------------------------------------------------------------
 // Get a list of all supported file extensions
-const aiImporterDesc* DXFImporter::GetInfo () const {
+const aiImporterDesc *DXFImporter::GetInfo() const {
     return &desc;
 }
 
 // ------------------------------------------------------------------------------------------------
 // Imports the given file into the given scene structure.
-void DXFImporter::InternReadFile( const std::string& filename, aiScene* pScene, IOSystem* pIOHandler) {
-    std::shared_ptr<IOStream> file = std::shared_ptr<IOStream>( pIOHandler->Open( filename) );
+void DXFImporter::InternReadFile(const std::string &filename, aiScene *pScene, IOSystem *pIOHandler) {
+    std::shared_ptr<IOStream> file = std::shared_ptr<IOStream>(pIOHandler->Open(filename));
 
     // Check whether we can read the file
-    if( file.get() == nullptr ) {
-        throw DeadlyImportError( "Failed to open DXF file ", filename, "");
+    if (file.get() == nullptr) {
+        throw DeadlyImportError("Failed to open DXF file ", filename, "");
     }
 
     // Check whether this is a binary DXF file - we can't read binary DXF files :-(
-    char buff[AI_DXF_BINARY_IDENT_LEN] = {0};
-    file->Read(buff,AI_DXF_BINARY_IDENT_LEN,1);
+    char buff[AI_DXF_BINARY_IDENT_LEN] = { 0 };
+    file->Read(buff, AI_DXF_BINARY_IDENT_LEN, 1);
 
-    if (0 == memcmp(AI_DXF_BINARY_IDENT,buff,AI_DXF_BINARY_IDENT_LEN)) {
+    if (0 == memcmp(AI_DXF_BINARY_IDENT, buff, AI_DXF_BINARY_IDENT_LEN)) {
         throw DeadlyImportError("DXF: Binary files are not supported at the moment");
     }
 
     // DXF files can grow very large, so read them via the StreamReader,
     // which will choose a suitable strategy.
-    file->Seek(0,aiOrigin_SET);
-    StreamReaderLE stream( file );
+    file->Seek(0, aiOrigin_SET);
+    StreamReaderLE stream(file);
 
-    DXF::LineReader reader (stream);
+    DXF::LineReader reader(stream);
     DXF::FileData output;
 
     // now get all lines of the file and process top-level sections
     bool eof = false;
-    while(!reader.End()) {
+    while (!reader.End()) {
 
         // blocks table - these 'build blocks' are later (in ENTITIES)
         // referenced an included via INSERT statements.
-        if (reader.Is(2,"BLOCKS")) {
-            ParseBlocks(reader,output);
+        if (reader.Is(2, "BLOCKS")) {
+            ParseBlocks(reader, output);
             continue;
         }
 
         // primary entity table
-        if (reader.Is(2,"ENTITIES")) {
-            ParseEntities(reader,output);
+        if (reader.Is(2, "ENTITIES")) {
+            ParseEntities(reader, output);
             continue;
         }
 
         // skip unneeded sections entirely to avoid any problems with them
         // altogether.
-        else if (reader.Is(2,"CLASSES") || reader.Is(2,"TABLES")) {
+        else if (reader.Is(2, "CLASSES") || reader.Is(2, "TABLES")) {
             SkipSection(reader);
             continue;
         }
 
-        else if (reader.Is(2,"HEADER")) {
-            ParseHeader(reader,output);
+        else if (reader.Is(2, "HEADER")) {
+            ParseHeader(reader, output);
             continue;
         }
 
@@ -204,7 +203,7 @@ void DXFImporter::InternReadFile( const std::string& filename, aiScene* pScene, 
         }
 
         // don't read past the official EOF sign
-        else if (reader.Is(0,"EOF")) {
+        else if (reader.Is(0, "EOF")) {
             eof = true;
             break;
         }
@@ -215,24 +214,25 @@ void DXFImporter::InternReadFile( const std::string& filename, aiScene* pScene, 
         ASSIMP_LOG_WARN("DXF: EOF reached, but did not encounter DXF EOF marker");
     }
 
-    ConvertMeshes(pScene,output);
+    ConvertMeshes(pScene, output);
 
     // Now rotate the whole scene by 90 degrees around the x axis to convert from AutoCAD's to Assimp's coordinate system
     pScene->mRootNode->mTransformation = aiMatrix4x4(
-        1.f,0.f,0.f,0.f,
-        0.f,0.f,1.f,0.f,
-        0.f,-1.f,0.f,0.f,
-        0.f,0.f,0.f,1.f) * pScene->mRootNode->mTransformation;
+                                                 1.f, 0.f, 0.f, 0.f,
+                                                 0.f, 0.f, 1.f, 0.f,
+                                                 0.f, -1.f, 0.f, 0.f,
+                                                 0.f, 0.f, 0.f, 1.f) *
+                                         pScene->mRootNode->mTransformation;
 }
 
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::ConvertMeshes(aiScene* pScene, DXF::FileData& output) {
+void DXFImporter::ConvertMeshes(aiScene *pScene, DXF::FileData &output) {
     // the process of resolving all the INSERT statements can grow the
     // poly-count excessively, so log the original number.
     // XXX Option to import blocks as separate nodes?
     if (!DefaultLogger::isNullLogger()) {
         unsigned int vcount = 0, icount = 0;
-        for (const DXF::Block& bl : output.blocks) {
+        for (const DXF::Block &bl : output.blocks) {
             for (std::shared_ptr<const DXF::PolyLine> pl : bl.lines) {
                 vcount += static_cast<unsigned int>(pl->positions.size());
                 icount += static_cast<unsigned int>(pl->counts.size());
@@ -242,17 +242,17 @@ void DXFImporter::ConvertMeshes(aiScene* pScene, DXF::FileData& output) {
         ASSIMP_LOG_VERBOSE_DEBUG("DXF: Unexpanded polycount is ", icount, ", vertex count is ", vcount);
     }
 
-    if (! output.blocks.size()  ) {
+    if (!output.blocks.size()) {
         throw DeadlyImportError("DXF: no data blocks loaded");
     }
 
-    DXF::Block* entities( nullptr );
+    DXF::Block *entities(nullptr);
 
     // index blocks by name
     DXF::BlockMap blocks_by_name;
-    for (DXF::Block& bl : output.blocks) {
+    for (DXF::Block &bl : output.blocks) {
         blocks_by_name[bl.name] = &bl;
-        if ( !entities && bl.name == AI_DXF_ENTITIES_MAGIC_BLOCK ) {
+        if (!entities && bl.name == AI_DXF_ENTITIES_MAGIC_BLOCK) {
             entities = &bl;
         }
     }
@@ -264,11 +264,11 @@ void DXFImporter::ConvertMeshes(aiScene* pScene, DXF::FileData& output) {
     typedef std::map<std::string, unsigned int> LayerMap;
 
     LayerMap layers;
-    std::vector< std::vector< const DXF::PolyLine*> > corr;
+    std::vector<std::vector<const DXF::PolyLine *>> corr;
 
     // now expand all block references in the primary ENTITIES block
     // XXX this involves heavy memory copying, consider a faster solution for future versions.
-    ExpandBlockReferences(*entities,blocks_by_name);
+    ExpandBlockReferences(*entities, blocks_by_name);
 
     unsigned int cur = 0;
     for (std::shared_ptr<const DXF::PolyLine> pl : entities->lines) {
@@ -280,76 +280,85 @@ void DXFImporter::ConvertMeshes(aiScene* pScene, DXF::FileData& output) {
 
                 layers[pl->layer] = cur++;
 
-                std::vector< const DXF::PolyLine* > pv;
+                std::vector<const DXF::PolyLine *> pv;
                 pv.push_back(&*pl);
 
                 corr.push_back(pv);
-            }
-            else {
+            } else {
                 corr[(*it).second].push_back(&*pl);
             }
         }
     }
 
-    if ( 0 == pScene->mNumMeshes) {
+    if (0 == pScene->mNumMeshes) {
         throw DeadlyImportError("DXF: this file contains no 3d data");
     }
 
-    pScene->mMeshes = new aiMesh*[ pScene->mNumMeshes ] ();
+    pScene->mMeshes = new aiMesh *[pScene->mNumMeshes]();
 
-    for(const LayerMap::value_type& elem : layers){
-        aiMesh* const mesh =  pScene->mMeshes[elem.second] = new aiMesh();
+    for (const LayerMap::value_type &elem : layers) {
+        aiMesh *const mesh = pScene->mMeshes[elem.second] = new aiMesh();
         mesh->mName.Set(elem.first);
 
-        unsigned int cvert = 0,cface = 0;
-        for(const DXF::PolyLine* pl : corr[elem.second]){
+        unsigned int cvert = 0, cface = 0;
+        for (const DXF::PolyLine *pl : corr[elem.second]) {
             // sum over all faces since we need to 'verbosify' them.
-            cvert += std::accumulate(pl->counts.begin(),pl->counts.end(),0);
+            cvert += std::accumulate(pl->counts.begin(), pl->counts.end(), 0);
             cface += static_cast<unsigned int>(pl->counts.size());
         }
 
-        aiVector3D* verts = mesh->mVertices = new aiVector3D[cvert];
-        aiColor4D* colors = mesh->mColors[0] = new aiColor4D[cvert];
-        aiFace* faces = mesh->mFaces = new aiFace[cface];
+        aiVector3D *verts = mesh->mVertices = new aiVector3D[cvert];
+        aiColor4D *colors = mesh->mColors[0] = new aiColor4D[cvert];
+        aiFace *faces = mesh->mFaces = new aiFace[cface];
 
         mesh->mNumVertices = cvert;
         mesh->mNumFaces = cface;
 
         unsigned int prims = 0;
         unsigned int overall_indices = 0;
-        for(const DXF::PolyLine* pl : corr[elem.second]){
+        for (const DXF::PolyLine *pl : corr[elem.second]) {
 
             std::vector<unsigned int>::const_iterator it = pl->indices.begin();
-            for(unsigned int facenumv : pl->counts) {
-                aiFace& face = *faces++;
+            for (unsigned int facenumv : pl->counts) {
+                aiFace &face = *faces++;
                 face.mIndices = new unsigned int[face.mNumIndices = facenumv];
 
+                bool allTransparent{ false };
                 for (unsigned int i = 0; i < facenumv; ++i) {
-                    face.mIndices[i] = overall_indices++;
 
                     ai_assert(pl->positions.size() == pl->colors.size());
-                    if (*it >= pl->positions.size()) {
-                        throw DeadlyImportError("DXF: vertex index out of bounds");
+                    auto index = *it++;
+
+                    auto color = pl->colors[index];
+                    if (color.a != 0)
+                        allTransparent = false;
+
+                    face.mIndices[i] = overall_indices++;
+                    if (index >= pl->positions.size()) {
+                        //throw DeadlyImportError("DXF: vertex index out of bounds");
+                        ASSIMP_LOG_WARN("DXF: wrapping vertex index.");
+                        index %= pl->positions.size();
                     }
 
-                    *verts++ = pl->positions[*it];
-                    *colors++ = pl->colors[*it++];
+                    *verts++ = pl->positions[index];
+                    *colors++ = color;
                 }
+                // remove fully transparent faces
 
                 // set primitive flags now, this saves the extra pass in ScenePreprocessor.
-                switch(face.mNumIndices) {
-                    case 1:
-                        prims |= aiPrimitiveType_POINT;
-                        break;
-                    case 2:
-                        prims |= aiPrimitiveType_LINE;
-                        break;
-                    case 3:
-                        prims |= aiPrimitiveType_TRIANGLE;
-                        break;
-                    default:
-                        prims |= aiPrimitiveType_POLYGON;
-                        break;
+                switch (face.mNumIndices) {
+                case 1:
+                    prims |= aiPrimitiveType_POINT;
+                    break;
+                case 2:
+                    prims |= aiPrimitiveType_LINE;
+                    break;
+                case 3:
+                    prims |= aiPrimitiveType_TRIANGLE;
+                    break;
+                default:
+                    prims |= aiPrimitiveType_POLYGON;
+                    break;
                 }
             }
         }
@@ -358,47 +367,45 @@ void DXFImporter::ConvertMeshes(aiScene* pScene, DXF::FileData& output) {
         mesh->mMaterialIndex = 0;
     }
 
-    GenerateHierarchy(pScene,output);
-    GenerateMaterials(pScene,output);
+    GenerateHierarchy(pScene, output);
+    GenerateMaterials(pScene, output);
 }
 
-
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::ExpandBlockReferences(DXF::Block& bl,const DXF::BlockMap& blocks_by_name) {
-    for (const DXF::InsertBlock& insert : bl.insertions) {
+void DXFImporter::ExpandBlockReferences(DXF::Block &bl, const DXF::BlockMap &blocks_by_name) {
+    for (const DXF::InsertBlock &insert : bl.insertions) {
 
         // first check if the referenced blocks exists ...
         const DXF::BlockMap::const_iterator it = blocks_by_name.find(insert.name);
         if (it == blocks_by_name.end()) {
-            ASSIMP_LOG_ERROR("DXF: Failed to resolve block reference: ", insert.name,"; skipping" );
+            ASSIMP_LOG_ERROR("DXF: Failed to resolve block reference: ", insert.name, "; skipping");
             continue;
         }
 
         // XXX this would be the place to implement recursive expansion if needed.
-        const DXF::Block& bl_src = *(*it).second;
+        const DXF::Block &bl_src = *(*it).second;
 
         for (std::shared_ptr<const DXF::PolyLine> pl_in : bl_src.lines) {
             if (!pl_in) {
                 ASSIMP_LOG_ERROR("DXF: PolyLine instance is nullptr, skipping.");
                 continue;
             }
-            
+
             std::shared_ptr<DXF::PolyLine> pl_out = std::shared_ptr<DXF::PolyLine>(new DXF::PolyLine(*pl_in));
 
-            if (bl_src.base.Length() || insert.scale.x!=1.f || insert.scale.y!=1.f || insert.scale.z!=1.f || insert.angle || insert.pos.Length()) {
+            if (bl_src.base.Length() || insert.scale.x != 1.f || insert.scale.y != 1.f || insert.scale.z != 1.f || insert.angle || insert.pos.Length()) {
                 // manual coordinate system transformation
                 // XXX order
                 aiMatrix4x4 trafo, tmp;
-                aiMatrix4x4::Translation(-bl_src.base,trafo);
-                trafo *= aiMatrix4x4::Scaling(insert.scale,tmp);
-                trafo *= aiMatrix4x4::Translation(insert.pos,tmp);
-
-                // XXX rotation currently ignored - I didn't find an appropriate sample model.
-                if (insert.angle != 0.f) {
-                    ASSIMP_LOG_WARN("DXF: BLOCK rotation not currently implemented");
+                aiMatrix4x4::Translation(-bl_src.base, trafo);
+                trafo *= aiMatrix4x4::Scaling(insert.scale, tmp);
+                trafo *= aiMatrix4x4::Translation(insert.pos, tmp);
+                trafo *= aiMatrix4x4::RotationZ(insert.angle * 3.14159265359 / 180.0, tmp);
+                if (insert.angle != 0) {
+                    ASSIMP_LOG_INFO("Rotating by ", insert.angle);
                 }
 
-                for (aiVector3D& v : pl_out->positions) {
+                for (aiVector3D &v : pl_out->positions) {
                     v *= trafo;
                 }
             }
@@ -409,43 +416,43 @@ void DXFImporter::ExpandBlockReferences(DXF::Block& bl,const DXF::BlockMap& bloc
 }
 
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::GenerateMaterials(aiScene* pScene, DXF::FileData& /*output*/) {
+void DXFImporter::GenerateMaterials(aiScene *pScene, DXF::FileData & /*output*/) {
     // generate an almost-white default material. Reason:
     // the default vertex color is GREY, so we are
     // already at Assimp's usual default color.
     // generate a default material
-    aiMaterial* pcMat = new aiMaterial();
+    aiMaterial *pcMat = new aiMaterial();
     aiString s;
     s.Set(AI_DEFAULT_MATERIAL_NAME);
     pcMat->AddProperty(&s, AI_MATKEY_NAME);
 
-    aiColor4D clrDiffuse(0.9f,0.9f,0.9f,1.0f);
-    pcMat->AddProperty(&clrDiffuse,1,AI_MATKEY_COLOR_DIFFUSE);
+    aiColor4D clrDiffuse(0.9f, 0.9f, 0.9f, 1.0f);
+    pcMat->AddProperty(&clrDiffuse, 1, AI_MATKEY_COLOR_DIFFUSE);
 
-    clrDiffuse = aiColor4D(1.0f,1.0f,1.0f,1.0f);
-    pcMat->AddProperty(&clrDiffuse,1,AI_MATKEY_COLOR_SPECULAR);
+    clrDiffuse = aiColor4D(1.0f, 1.0f, 1.0f, 1.0f);
+    pcMat->AddProperty(&clrDiffuse, 1, AI_MATKEY_COLOR_SPECULAR);
 
-    clrDiffuse = aiColor4D(0.05f,0.05f,0.05f,1.0f);
-    pcMat->AddProperty(&clrDiffuse,1,AI_MATKEY_COLOR_AMBIENT);
+    clrDiffuse = aiColor4D(0.05f, 0.05f, 0.05f, 1.0f);
+    pcMat->AddProperty(&clrDiffuse, 1, AI_MATKEY_COLOR_AMBIENT);
 
     pScene->mNumMaterials = 1;
-    pScene->mMaterials = new aiMaterial*[1];
+    pScene->mMaterials = new aiMaterial *[1];
     pScene->mMaterials[0] = pcMat;
 }
 
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::GenerateHierarchy(aiScene* pScene, DXF::FileData& /*output*/) {
+void DXFImporter::GenerateHierarchy(aiScene *pScene, DXF::FileData & /*output*/) {
     // generate the output scene graph, which is just the root node with a single child for each layer.
     pScene->mRootNode = new aiNode();
     pScene->mRootNode->mName.Set("<DXF_ROOT>");
 
-    if (1 == pScene->mNumMeshes)    {
-        pScene->mRootNode->mMeshes = new unsigned int[ pScene->mRootNode->mNumMeshes = 1 ];
+    if (1 == pScene->mNumMeshes) {
+        pScene->mRootNode->mMeshes = new unsigned int[pScene->mRootNode->mNumMeshes = 1];
         pScene->mRootNode->mMeshes[0] = 0;
     } else {
-        pScene->mRootNode->mChildren = new aiNode*[ pScene->mRootNode->mNumChildren = pScene->mNumMeshes ];
-        for (unsigned int m = 0; m < pScene->mRootNode->mNumChildren;++m)   {
-            aiNode* p = pScene->mRootNode->mChildren[m] = new aiNode();
+        pScene->mRootNode->mChildren = new aiNode *[pScene->mRootNode->mNumChildren = pScene->mNumMeshes];
+        for (unsigned int m = 0; m < pScene->mRootNode->mNumChildren; ++m) {
+            aiNode *p = pScene->mRootNode->mChildren[m] = new aiNode();
             p->mName = pScene->mMeshes[m]->mName;
 
             p->mMeshes = new unsigned int[p->mNumMeshes = 1];
@@ -455,67 +462,70 @@ void DXFImporter::GenerateHierarchy(aiScene* pScene, DXF::FileData& /*output*/) 
     }
 }
 
-
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::SkipSection(DXF::LineReader& reader) {
-    for( ;!reader.End() && !reader.Is(0,"ENDSEC"); reader++);
+void DXFImporter::SkipSection(DXF::LineReader &reader) {
+    for (; !reader.End() && !reader.Is(0, "ENDSEC"); reader++)
+        ;
 }
 
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::ParseHeader(DXF::LineReader& reader, DXF::FileData& ) {
-    for( ;!reader.End() && !reader.Is(0,"ENDSEC"); reader++);
+void DXFImporter::ParseHeader(DXF::LineReader &reader, DXF::FileData &) {
+    for (; !reader.End() && !reader.Is(0, "ENDSEC"); reader++)
+        ;
 }
 
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::ParseBlocks(DXF::LineReader& reader, DXF::FileData& output) {
-    while( !reader.End() && !reader.Is(0,"ENDSEC")) {
-        if (reader.Is(0,"BLOCK")) {
-            ParseBlock(++reader,output);
+void DXFImporter::ParseBlocks(DXF::LineReader &reader, DXF::FileData &output) {
+    while (!reader.End() && !reader.Is(0, "ENDSEC")) {
+        if (reader.Is(0, "BLOCK")) {
+            ParseBlock(++reader, output);
             continue;
         }
         ++reader;
     }
 
-    ASSIMP_LOG_VERBOSE_DEBUG("DXF: got ", output.blocks.size()," entries in BLOCKS" );
+    ASSIMP_LOG_VERBOSE_DEBUG("DXF: got ", output.blocks.size(), " entries in BLOCKS");
 }
 
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::ParseBlock(DXF::LineReader& reader, DXF::FileData& output) {
+void DXFImporter::ParseBlock(DXF::LineReader &reader, DXF::FileData &output) {
     // push a new block onto the stack.
-    output.blocks.push_back( DXF::Block() );
-    DXF::Block& block = output.blocks.back();
+    output.blocks.push_back(DXF::Block());
+    DXF::Block &block = output.blocks.back();
 
-    while( !reader.End() && !reader.Is(0,"ENDBLK")) {
+    while (!reader.End() && !reader.Is(0, "ENDBLK")) {
 
-        switch(reader.GroupCode()) {
-            case GroupCode_Name:
-                block.name = reader.Value();
-                break;
+        switch (reader.GroupCode()) {
+        case GroupCode_Name:
+            block.name = reader.Value();
+            break;
 
-            case GroupCode_XComp:
-                block.base.x = reader.ValueAsFloat();
-                break;
-            case GroupCode_YComp:
-                block.base.y = reader.ValueAsFloat();
-                break;
-            case GroupCode_ZComp:
-                block.base.z = reader.ValueAsFloat();
-                break;
+        case GroupCode_XComp:
+            block.base.x = reader.ValueAsFloat();
+            break;
+        case GroupCode_YComp:
+            block.base.y = reader.ValueAsFloat();
+            break;
+        case GroupCode_ZComp:
+            block.base.z = reader.ValueAsFloat();
+            break;
         }
 
-        if (reader.Is(0,"POLYLINE")) {
-            ParsePolyLine(++reader,output);
+        if (reader.Is(0, "POLYLINE")) {
+            ParsePolyLine(++reader, output, block.name);
             continue;
         }
 
         // XXX is this a valid case?
-        if (reader.Is(0,"INSERT")) {
-            ASSIMP_LOG_WARN("DXF: INSERT within a BLOCK not currently supported; skipping");
-            for( ;!reader.End() && !reader.Is(0,"ENDBLK"); ++reader);
+        if (reader.Is(0, "INSERT")) {
+            //ASSIMP_LOG_WARN("DXF: INSERT within a BLOCK not currently supported; skipping");
+            ParseInsertion(++reader, output);
+            //for (; !reader.End() && !reader.Is(0, "ENDBLK"); ++reader)
+            //    ;
             break;
         }
 
-        else if (reader.Is(0,"3DFACE") || reader.Is(0,"LINE") || reader.Is(0,"3DLINE")) {
+        else if (reader.Is(0, "3DFACE") || reader.Is(0, "LINE") || reader.Is(0, "3DLINE")) {
             //http://sourceforge.net/tracker/index.php?func=detail&aid=2970566&group_id=226462&atid=1067632
             Parse3DFace(++reader, output);
             continue;
@@ -525,25 +535,25 @@ void DXFImporter::ParseBlock(DXF::LineReader& reader, DXF::FileData& output) {
 }
 
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::ParseEntities(DXF::LineReader& reader, DXF::FileData& output) {
+void DXFImporter::ParseEntities(DXF::LineReader &reader, DXF::FileData &output) {
     // Push a new block onto the stack.
-    output.blocks.push_back( DXF::Block() );
-    DXF::Block& block = output.blocks.back();
+    output.blocks.push_back(DXF::Block());
+    DXF::Block &block = output.blocks.back();
 
     block.name = AI_DXF_ENTITIES_MAGIC_BLOCK;
 
-    while( !reader.End() && !reader.Is(0,"ENDSEC")) {
-        if (reader.Is(0,"POLYLINE")) {
-            ParsePolyLine(++reader,output);
+    while (!reader.End() && !reader.Is(0, "ENDSEC")) {
+        if (reader.Is(0, "POLYLINE")) {
+            ParsePolyLine(++reader, output, block.name);
             continue;
         }
 
-        else if (reader.Is(0,"INSERT")) {
-            ParseInsertion(++reader,output);
+        else if (reader.Is(0, "INSERT")) {
+            ParseInsertion(++reader, output);
             continue;
         }
 
-        else if (reader.Is(0,"3DFACE") || reader.Is(0,"LINE") || reader.Is(0,"3DLINE")) {
+        else if (reader.Is(0, "3DFACE") || reader.Is(0, "LINE") || reader.Is(0, "3DLINE")) {
             //http://sourceforge.net/tracker/index.php?func=detail&aid=2970566&group_id=226462&atid=1067632
             Parse3DFace(++reader, output);
             continue;
@@ -552,16 +562,16 @@ void DXFImporter::ParseEntities(DXF::LineReader& reader, DXF::FileData& output) 
         ++reader;
     }
 
-    ASSIMP_LOG_VERBOSE_DEBUG( "DXF: got ", block.lines.size()," polylines and ", block.insertions.size(),
-        " inserted blocks in ENTITIES" );
+    ASSIMP_LOG_VERBOSE_DEBUG("DXF: got ", block.lines.size(), " polylines and ", block.insertions.size(),
+            " inserted blocks in ENTITIES");
 }
 
-void DXFImporter::ParseInsertion(DXF::LineReader& reader, DXF::FileData& output) {
-    output.blocks.back().insertions.push_back( DXF::InsertBlock() );
-    DXF::InsertBlock& bl = output.blocks.back().insertions.back();
+void DXFImporter::ParseInsertion(DXF::LineReader &reader, DXF::FileData &output) {
+    output.blocks.back().insertions.push_back(DXF::InsertBlock());
+    DXF::InsertBlock &bl = output.blocks.back().insertions.back();
 
-    while( !reader.End() && !reader.Is(0)) {
-        switch(reader.GroupCode()) {
+    while (!reader.End() && !reader.Is(0)) {
+        switch (reader.GroupCode()) {
             // name of referenced block
         case GroupCode_Name:
             bl.name = reader.Value();
@@ -598,33 +608,32 @@ void DXFImporter::ParseInsertion(DXF::LineReader& reader, DXF::FileData& output)
     }
 }
 
-#define DXF_POLYLINE_FLAG_CLOSED        0x1
-#define DXF_POLYLINE_FLAG_3D_POLYLINE   0x8
-#define DXF_POLYLINE_FLAG_3D_POLYMESH   0x10
-#define DXF_POLYLINE_FLAG_POLYFACEMESH  0x40
+#define DXF_POLYLINE_FLAG_CLOSED 0x1
+#define DXF_POLYLINE_FLAG_3D_POLYLINE 0x8
+#define DXF_POLYLINE_FLAG_3D_POLYMESH 0x10
+#define DXF_POLYLINE_FLAG_POLYFACEMESH 0x40
 
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::ParsePolyLine(DXF::LineReader& reader, DXF::FileData& output) {
-    output.blocks.back().lines.push_back( std::shared_ptr<DXF::PolyLine>( new DXF::PolyLine() ) );
-    DXF::PolyLine& line = *output.blocks.back().lines.back();
+void DXFImporter::ParsePolyLine(DXF::LineReader &reader, DXF::FileData &output, const std::string &blockName) {
+    output.blocks.back().lines.push_back(std::shared_ptr<DXF::PolyLine>(new DXF::PolyLine()));
+    DXF::PolyLine &line = *output.blocks.back().lines.back();
 
     unsigned int iguess = 0, vguess = 0;
-    while( !reader.End() && !reader.Is(0,"ENDSEC")) {
+    while (!reader.End() && !reader.Is(0, "ENDSEC")) {
 
-        if (reader.Is(0,"VERTEX")) {
-            ParsePolyLineVertex(++reader,line);
-            if (reader.Is(0,"SEQEND")) {
+        if (reader.Is(0, "VERTEX")) {
+            ParsePolyLineVertex(++reader, line);
+            if (reader.Is(0, "SEQEND")) {
                 break;
             }
             continue;
         }
 
-        switch(reader.GroupCode())
-        {
+        switch (reader.GroupCode()) {
         // flags --- important that we know whether it is a
         // polyface mesh or 'just' a line.
         case 70:
-            if (!line.flags)    {
+            if (!line.flags) {
                 line.flags = reader.ValueAsSignedInt();
             }
             break;
@@ -650,6 +659,9 @@ void DXFImporter::ParsePolyLine(DXF::LineReader& reader, DXF::FileData& output) 
         reader++;
     }
 
+    if (blockName.size() > 0)
+        line.layer = blockName;
+
     //if (!(line.flags & DXF_POLYLINE_FLAG_POLYFACEMESH))   {
     //  DefaultLogger::get()->warn((Formatter::format("DXF: polyline not currently supported: "),line.flags));
     //  output.blocks.back().lines.pop_back();
@@ -658,11 +670,11 @@ void DXFImporter::ParsePolyLine(DXF::LineReader& reader, DXF::FileData& output) 
 
     if (vguess && line.positions.size() != vguess) {
         ASSIMP_LOG_WARN("DXF: unexpected vertex count in polymesh: ",
-            line.positions.size(),", expected ", vguess );
+                line.positions.size(), ", expected ", vguess);
     }
 
-    if (line.flags & DXF_POLYLINE_FLAG_POLYFACEMESH ) {
-        if (line.positions.size() < 3 || line.indices.size() < 3)   {
+    if (line.flags & DXF_POLYLINE_FLAG_POLYFACEMESH) {
+        if (line.positions.size() < 3 || line.indices.size() < 3) {
             ASSIMP_LOG_WARN("DXF: not enough vertices for polymesh; ignoring");
             output.blocks.back().lines.pop_back();
             return;
@@ -673,24 +685,23 @@ void DXFImporter::ParsePolyLine(DXF::LineReader& reader, DXF::FileData& output) 
         // to set the 71 and 72 fields, respectively, to valid values.
         // So just fire a warning.
         if (iguess && line.counts.size() != iguess) {
-            ASSIMP_LOG_WARN( "DXF: unexpected face count in polymesh: ", line.counts.size(),", expected ", iguess );
+            ASSIMP_LOG_WARN("DXF: unexpected face count in polymesh: ", line.counts.size(), ", expected ", iguess);
         }
-    }
-    else if (!line.indices.size() && !line.counts.size()) {
+    } else if (!line.indices.size() && !line.counts.size()) {
         // a poly-line - so there are no indices yet.
         size_t guess = line.positions.size() + (line.flags & DXF_POLYLINE_FLAG_CLOSED ? 1 : 0);
         line.indices.reserve(guess);
 
-        line.counts.reserve(guess/2);
-        for (unsigned int i = 0; i < line.positions.size()/2; ++i) {
-            line.indices.push_back(i*2);
-            line.indices.push_back(i*2+1);
+        line.counts.reserve(guess / 2);
+        for (unsigned int i = 0; i < line.positions.size() / 2; ++i) {
+            line.indices.push_back(i * 2);
+            line.indices.push_back(i * 2 + 1);
             line.counts.push_back(2);
         }
 
         // closed polyline?
         if (line.flags & DXF_POLYLINE_FLAG_CLOSED) {
-            line.indices.push_back(static_cast<unsigned int>(line.positions.size()-1));
+            line.indices.push_back(static_cast<unsigned int>(line.positions.size() - 1));
             line.indices.push_back(0);
             line.counts.push_back(2);
         }
@@ -701,32 +712,38 @@ void DXFImporter::ParsePolyLine(DXF::LineReader& reader, DXF::FileData& output) 
 #define DXF_VERTEX_FLAG_HAS_POSITIONS 0x40
 
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::ParsePolyLineVertex(DXF::LineReader& reader, DXF::PolyLine& line) {
+void DXFImporter::ParsePolyLineVertex(DXF::LineReader &reader, DXF::PolyLine &line) {
+    static bool keepLogging{ false };
+    bool logNow{ keepLogging };
+    bool hasNegativeVertex = false;
     unsigned int cnti = 0, flags = 0;
     unsigned int indices[4];
 
     aiVector3D out;
     aiColor4D clr = AI_DXF_DEFAULT_COLOR;
 
-    while( !reader.End() ) {
+    while (!reader.End()) {
 
         if (reader.Is(0)) { // SEQEND or another VERTEX
             break;
         }
 
+        if (logNow)
+            ASSIMP_LOG_DEBUG("DXFD: GroupCode ", reader.GroupCode());
+
         switch (reader.GroupCode()) {
         case 8:
-                // layer to which the vertex belongs to - assume that
-                // this is always the layer the top-level poly-line
-                // entity resides on as well.
-                if(reader.Value() != line.layer) {
-                    ASSIMP_LOG_WARN("DXF: expected vertex to be part of a poly-face but the 0x128 flag isn't set");
-                }
-                break;
+            // layer to which the vertex belongs to - assume that
+            // this is always the layer the top-level poly-line
+            // entity resides on as well.
+            if (reader.Value() != line.layer) {
+                ASSIMP_LOG_WARN("DXF: expected vertex to be part of a poly-face but the 0x128 flag isn't set");
+            }
+            break;
 
         case 70:
-                flags = reader.ValueAsUnsignedInt();
-                break;
+            flags = reader.ValueAsUnsignedInt();
+            break;
 
         // VERTEX COORDINATES
         case GroupCode_XComp:
@@ -750,7 +767,18 @@ void DXFImporter::ParsePolyLineVertex(DXF::LineReader& reader, DXF::PolyLine& li
                 ASSIMP_LOG_WARN("DXF: more than 4 indices per face not supported; ignoring");
                 break;
             }
-            indices[cnti++] = reader.ValueAsUnsignedInt();
+            int gc;
+            gc = reader.GroupCode();
+            int val;
+            val = reader.ValueAsSignedInt();
+            indices[cnti++] = abs(val);
+            if (val < 0) {
+                hasNegativeVertex = true;
+                ASSIMP_LOG_WARN("DXF: Ignoring negativeness (invisibility) of vertex ", val);
+            }
+
+            if (logNow)
+                ASSIMP_LOG_DEBUG("DXFD: Index ", cnti - 1, "(", gc, ") is ", indices[cnti - 1]);
             break;
 
         // color
@@ -767,20 +795,35 @@ void DXFImporter::ParsePolyLineVertex(DXF::LineReader& reader, DXF::PolyLine& li
     }
 
     if (cnti) {
-        line.counts.push_back(cnti);
+        unsigned int last_count = 0;
         for (unsigned int i = 0; i < cnti; ++i) {
             // IMPORTANT NOTE: POLYMESH indices are ONE-BASED
             if (indices[i] == 0) {
-                ASSIMP_LOG_WARN("DXF: invalid vertex index, indices are one-based.");
-                --line.counts.back();
-                // Workaround to fix issue 2229
-                if (line.counts.back() == 0) {
-                    line.counts.pop_back();
+                // zero marks the end of a face
+                auto new_count = i - last_count;
+                if (new_count > 0) {
+                    if (logNow)
+                        ASSIMP_LOG_DEBUG("DXF: index ", i, " is zero - marking end as ", new_count);
+                    line.counts.push_back(new_count);
+                } else {
+                    keepLogging = false;
+                    if (logNow)
+                        ASSIMP_LOG_DEBUG("DXF: index ", i, " is zero - not marking end.");
                 }
-                continue;
+                last_count = new_count + 1; // need to skip the zero
+            } else {
+                if (logNow)
+                    ASSIMP_LOG_DEBUG("DXF: index ", i, " is ", indices[i]);
+                line.indices.push_back(indices[i] - 1);
             }
-            line.indices.push_back(indices[i]-1);
         }
+        if (last_count < cnti) {
+            if (logNow)
+                ASSIMP_LOG_DEBUG("DXF: marking end as ", cnti - last_count);
+            line.counts.push_back(cnti - last_count);
+        }
+        if (logNow)
+            ASSIMP_LOG_DEBUG("DXF: Done");
     } else {
         line.positions.push_back(out);
         line.colors.push_back(clr);
@@ -788,26 +831,24 @@ void DXFImporter::ParsePolyLineVertex(DXF::LineReader& reader, DXF::PolyLine& li
 }
 
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::Parse3DFace(DXF::LineReader& reader, DXF::FileData& output)
-{
+void DXFImporter::Parse3DFace(DXF::LineReader &reader, DXF::FileData &output) {
     // (note) this is also used for for parsing line entities, so we
     // must handle the vertex_count == 2 case as well.
 
-    output.blocks.back().lines.push_back( std::shared_ptr<DXF::PolyLine>( new DXF::PolyLine() )  );
-    DXF::PolyLine& line = *output.blocks.back().lines.back();
+    output.blocks.back().lines.push_back(std::shared_ptr<DXF::PolyLine>(new DXF::PolyLine()));
+    DXF::PolyLine &line = *output.blocks.back().lines.back();
 
     aiVector3D vip[4];
-    aiColor4D  clr = AI_DXF_DEFAULT_COLOR;
+    aiColor4D clr = AI_DXF_DEFAULT_COLOR;
 
-    bool b[4] = {false,false,false,false};
-    while( !reader.End() ) {
+    bool b[4] = { false, false, false, false };
+    while (!reader.End()) {
 
         // next entity with a groupcode == 0 is probably already the next vertex or polymesh entity
         if (reader.GroupCode() == 0) {
             break;
         }
-        switch (reader.GroupCode())
-        {
+        switch (reader.GroupCode()) {
 
         // 8 specifies the layer
         case 8:
@@ -908,7 +949,7 @@ void DXFImporter::Parse3DFace(DXF::LineReader& reader, DXF::FileData& output)
         return;
     }
 
-    const unsigned int cnt = (2+(b[0]?1:0)+(b[1]?1:0));
+    const unsigned int cnt = (2 + (b[0] ? 1 : 0) + (b[1] ? 1 : 0));
     line.counts.push_back(cnt);
 
     for (unsigned int i = 0; i < cnt; ++i) {

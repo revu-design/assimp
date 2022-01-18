@@ -49,18 +49,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <assimp/BaseImporter.h>
 #include <map>
 
-namespace Assimp    {
+namespace Assimp {
 
 // Forward declarations
 namespace DXF {
-    class LineReader;
-    struct FileData;
-    struct PolyLine;
-    struct Block;
-    struct InsertBlock;
+class LineReader;
+struct FileData;
+struct PolyLine;
+struct Block;
+struct InsertBlock;
 
-    using BlockMap = std::map<std::string, const DXF::Block*>;
-}
+using BlockMap = std::map<std::string, const DXF::Block *>;
+} // namespace DXF
 
 // ---------------------------------------------------------------------------
 /**
@@ -74,71 +74,71 @@ public:
     // -------------------------------------------------------------------
     /** Returns whether the class can handle the format of the given file.
     * See BaseImporter::CanRead() for details.  */
-    bool CanRead( const std::string& pFile, IOSystem* pIOHandler,
-        bool checkSig) const override;
+    bool CanRead(const std::string &pFile, IOSystem *pIOHandler,
+            bool checkSig) const override;
 
 protected:
     // -------------------------------------------------------------------
     /** Return importer meta information.
      * See #BaseImporter::GetInfo for the details*/
-    const aiImporterDesc* GetInfo () const override;
+    const aiImporterDesc *GetInfo() const override;
 
     // -------------------------------------------------------------------
     /** Imports the given file into the given scene structure.
      * See BaseImporter::InternReadFile() for details */
-    void InternReadFile( const std::string& pFile, aiScene* pScene, IOSystem* pIOHandler) override;
+    void InternReadFile(const std::string &pFile, aiScene *pScene, IOSystem *pIOHandler) override;
 
 private:
     // -----------------------------------------------------
-    void SkipSection(DXF::LineReader& reader);
+    void SkipSection(DXF::LineReader &reader);
 
     // -----------------------------------------------------
-    void ParseHeader(DXF::LineReader& reader,
-        DXF::FileData& output);
+    void ParseHeader(DXF::LineReader &reader,
+            DXF::FileData &output);
 
     // -----------------------------------------------------
-    void ParseEntities(DXF::LineReader& reader,
-        DXF::FileData& output);
+    void ParseEntities(DXF::LineReader &reader,
+            DXF::FileData &output);
 
     // -----------------------------------------------------
-    void ParseBlocks(DXF::LineReader& reader,
-        DXF::FileData& output);
+    void ParseBlocks(DXF::LineReader &reader,
+            DXF::FileData &output);
 
     // -----------------------------------------------------
-    void ParseBlock(DXF::LineReader& reader,
-        DXF::FileData& output);
+    void ParseBlock(DXF::LineReader &reader,
+            DXF::FileData &output);
 
     // -----------------------------------------------------
-    void ParseInsertion(DXF::LineReader& reader,
-        DXF::FileData& output);
+    void ParseInsertion(DXF::LineReader &reader,
+            DXF::FileData &output);
 
     // -----------------------------------------------------
-    void ParsePolyLine(DXF::LineReader& reader,
-        DXF::FileData& output);
+    void ParsePolyLine(DXF::LineReader &reader,
+            DXF::FileData &output, const std::string &blockName);
 
     // -----------------------------------------------------
-    void ParsePolyLineVertex(DXF::LineReader& reader,
-        DXF::PolyLine& line);
+    void ParsePolyLineVertex(DXF::LineReader &reader,
+            DXF::PolyLine &line);
 
     // -----------------------------------------------------
-    void Parse3DFace(DXF::LineReader& reader,
-        DXF::FileData& output);
+    void Parse3DFace(DXF::LineReader &reader,
+            DXF::FileData &output);
 
     // -----------------------------------------------------
-    void ConvertMeshes(aiScene* pScene,
-        DXF::FileData& output);
+    void ConvertMeshes(aiScene *pScene,
+            DXF::FileData &output);
 
     // -----------------------------------------------------
-    void GenerateHierarchy(aiScene* pScene,
-        DXF::FileData& output);
+    void GenerateHierarchy(aiScene *pScene,
+            DXF::FileData &output);
 
     // -----------------------------------------------------
-    void GenerateMaterials(aiScene* pScene,
-        DXF::FileData& output);
+    void GenerateMaterials(aiScene *pScene,
+            DXF::FileData &output);
 
     // -----------------------------------------------------
-    void ExpandBlockReferences(DXF::Block& bl,
-        const DXF::BlockMap& blocks_by_name);
+    void ExpandBlockReferences(DXF::Block &bl,
+            const DXF::BlockMap &blocks_by_name);
 };
 
 } // end of namespace Assimp
