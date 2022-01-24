@@ -252,6 +252,7 @@ void DXFImporter::ConvertMeshes(aiScene *pScene, DXF::FileData &output) {
     DXF::BlockMap blocks_by_name;
     for (DXF::Block &bl : output.blocks) {
         blocks_by_name[bl.name] = &bl;
+        bl.used = false; // check that the blocks are all used in the expansion below
         if (!entities && bl.name == AI_DXF_ENTITIES_MAGIC_BLOCK) {
             entities = &bl;
         }
@@ -269,6 +270,12 @@ void DXFImporter::ConvertMeshes(aiScene *pScene, DXF::FileData &output) {
     // now expand all block references in the primary ENTITIES block
     // XXX this involves heavy memory copying, consider a faster solution for future versions.
     ExpandBlockReferences(*entities, blocks_by_name);
+
+    for (auto &bl : output.blocks) {
+        if (!bl.used) {
+            ASSIMP_LOG_WARN("Unused block ", bl.name);
+        }
+    }
 
     unsigned int cur = 0;
     for (std::shared_ptr<const DXF::PolyLine> pl : entities->lines) {
@@ -335,15 +342,12 @@ void DXFImporter::ConvertMeshes(aiScene *pScene, DXF::FileData &output) {
 
                     face.mIndices[i] = overall_indices++;
                     if (index >= pl->positions.size()) {
-                        //throw DeadlyImportError("DXF: vertex index out of bounds");
-                        ASSIMP_LOG_WARN("DXF: wrapping vertex index.");
-                        index %= pl->positions.size();
+                        throw DeadlyImportError("DXF: vertex index out of bounds");
                     }
 
                     *verts++ = pl->positions[index];
                     *colors++ = color;
                 }
-                // remove fully transparent faces
 
                 // set primitive flags now, this saves the extra pass in ScenePreprocessor.
                 switch (face.mNumIndices) {
@@ -382,8 +386,10 @@ void DXFImporter::ExpandBlockReferences(DXF::Block &bl, const DXF::BlockMap &blo
             continue;
         }
 
-        // XXX this would be the place to implement recursive expansion if needed.
-        const DXF::Block &bl_src = *(*it).second;
+        DXF::Block &bl_src = *(*it).second;
+        ExpandBlockReferences(bl_src, blocks_by_name);
+
+        bl_src.used = true;
 
         for (std::shared_ptr<const DXF::PolyLine> pl_in : bl_src.lines) {
             if (!pl_in) {
@@ -451,14 +457,25 @@ void DXFImporter::GenerateHierarchy(aiScene *pScene, DXF::FileData & /*output*/)
         pScene->mRootNode->mMeshes[0] = 0;
     } else {
         pScene->mRootNode->mChildren = new aiNode *[pScene->mRootNode->mNumChildren = pScene->mNumMeshes];
+        unsigned int skippedChildren = 0;
         for (unsigned int m = 0; m < pScene->mRootNode->mNumChildren; ++m) {
-            aiNode *p = pScene->mRootNode->mChildren[m] = new aiNode();
+            // XXX - just testing - removing problematic entities
+            if (false //pScene->mMeshes[m]->mName == aiString("A-FLOR-LEVL") //||
+                    //   pScene->mMeshes[m]->mName == aiString("A-AREA") //||
+                    //pScene->mMeshes[m]->mName == aiString("$ASSIMP_ENTITIES_MAGIC")
+            ) {
+                skippedChildren++;
+                continue;
+            }
+
+            aiNode *p = pScene->mRootNode->mChildren[m - skippedChildren] = new aiNode();
             p->mName = pScene->mMeshes[m]->mName;
 
             p->mMeshes = new unsigned int[p->mNumMeshes = 1];
             p->mMeshes[0] = m;
             p->mParent = pScene->mRootNode;
         }
+        pScene->mRootNode->mNumChildren -= skippedChildren;
     }
 }
 
@@ -480,6 +497,8 @@ void DXFImporter::ParseBlocks(DXF::LineReader &reader, DXF::FileData &output) {
         if (reader.Is(0, "BLOCK")) {
             ParseBlock(++reader, output);
             continue;
+        } else {
+            ASSIMP_LOG_WARN("Skipping outside block ", reader.GroupCode(), " : ", reader.Value());
         }
         ++reader;
     }
@@ -495,6 +514,26 @@ void DXFImporter::ParseBlock(DXF::LineReader &reader, DXF::FileData &output) {
 
     while (!reader.End() && !reader.Is(0, "ENDBLK")) {
 
+        if (reader.Is(0, "POLYLINE")) {
+            ParsePolyLine(++reader, output, block.name);
+            continue;
+        }
+
+        // XXX is this a valid case?
+        if (reader.Is(0, "INSERT")) {
+            //ASSIMP_LOG_WARN("DXF: INSERT within a BLOCK not currently supported; skipping");
+            ParseInsertion(++reader, output);
+            //for (; !reader.End() && !reader.Is(0, "ENDBLK"); ++reader)
+            //    ;
+            continue;
+        }
+
+        if (reader.Is(0, "3DFACE") || reader.Is(0, "LINE") || reader.Is(0, "3DLINE")) {
+            //http://sourceforge.net/tracker/index.php?func=detail&aid=2970566&group_id=226462&atid=1067632
+            Parse3DFace(++reader, output);
+            continue;
+        }
+
         switch (reader.GroupCode()) {
         case GroupCode_Name:
             block.name = reader.Value();
@@ -509,27 +548,12 @@ void DXFImporter::ParseBlock(DXF::LineReader &reader, DXF::FileData &output) {
         case GroupCode_ZComp:
             block.base.z = reader.ValueAsFloat();
             break;
-        }
-
-        if (reader.Is(0, "POLYLINE")) {
-            ParsePolyLine(++reader, output, block.name);
-            continue;
-        }
-
-        // XXX is this a valid case?
-        if (reader.Is(0, "INSERT")) {
-            //ASSIMP_LOG_WARN("DXF: INSERT within a BLOCK not currently supported; skipping");
-            ParseInsertion(++reader, output);
-            //for (; !reader.End() && !reader.Is(0, "ENDBLK"); ++reader)
-            //    ;
+        case 0:
             break;
+        default:
+            ASSIMP_LOG_WARN("Skipping in Block ", reader.GroupCode(), " : ", reader.Value());
         }
 
-        else if (reader.Is(0, "3DFACE") || reader.Is(0, "LINE") || reader.Is(0, "3DLINE")) {
-            //http://sourceforge.net/tracker/index.php?func=detail&aid=2970566&group_id=226462&atid=1067632
-            Parse3DFace(++reader, output);
-            continue;
-        }
         ++reader;
     }
 }
@@ -553,10 +577,12 @@ void DXFImporter::ParseEntities(DXF::LineReader &reader, DXF::FileData &output) 
             continue;
         }
 
-        else if (reader.Is(0, "3DFACE") || reader.Is(0, "LINE") || reader.Is(0, "3DLINE")) {
+        else if (reader.Is(0, "3DFACE") /* || reader.Is(0, "LINE") */ || reader.Is(0, "3DLINE")) {
             //http://sourceforge.net/tracker/index.php?func=detail&aid=2970566&group_id=226462&atid=1067632
             Parse3DFace(++reader, output);
             continue;
+        } else {
+            ASSIMP_LOG_WARN("Skipping Entity ", reader.GroupCode(), " : ", reader.Value());
         }
 
         ++reader;
@@ -654,13 +680,17 @@ void DXFImporter::ParsePolyLine(DXF::LineReader &reader, DXF::FileData &output, 
         case 8:
             line.layer = reader.Value();
             break;
+        default:
+            ASSIMP_LOG_WARN("Skipping in Polyline ", reader.GroupCode(), " : ", reader.Value());
         }
 
         reader++;
     }
 
-    if (blockName.size() > 0)
+    if (blockName.size() > 0) {
+        ASSIMP_LOG_DEBUG("Setting Polyline Name to ", blockName);
         line.layer = blockName;
+    }
 
     //if (!(line.flags & DXF_POLYLINE_FLAG_POLYFACEMESH))   {
     //  DefaultLogger::get()->warn((Formatter::format("DXF: polyline not currently supported: "),line.flags));

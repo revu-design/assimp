@@ -59,7 +59,7 @@ struct PolyLine;
 struct Block;
 struct InsertBlock;
 
-using BlockMap = std::map<std::string, const DXF::Block *>;
+using BlockMap = std::map<std::string, DXF::Block *>;
 } // namespace DXF
 
 // ---------------------------------------------------------------------------

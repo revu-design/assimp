@@ -48,11 +48,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define INCLUDED_DXFHELPER_H
 
 #include <assimp/LineSplitter.h>
-#include <assimp/TinyFormatter.h>
 #include <assimp/StreamReader.h>
+#include <assimp/TinyFormatter.h>
 #include <assimp/fast_atof.h>
-#include <vector>
 #include <assimp/DefaultLogger.hpp>
+#include <vector>
 
 namespace Assimp {
 namespace DXF {
@@ -62,17 +62,14 @@ namespace DXF {
 // do NOT skip empty lines. In DXF files, they count as valid data.
 class LineReader {
 public:
-    LineReader(StreamReaderLE& reader)
-    : splitter(reader,false,true)
-    , groupcode( 0 )
-    , value()
-    , end() {
+    LineReader(StreamReaderLE &reader) :
+            splitter(reader, false, true), groupcode(0), value(), end() {
         // empty
     }
 
     // -----------------------------------------
-    bool Is(int gc, const char* what) const {
-        return groupcode == gc && !strcmp(what,value.c_str());
+    bool Is(int gc, const char *what) const {
+        return groupcode == gc && !strcmp(what, value.c_str());
     }
 
     // -----------------------------------------
@@ -86,7 +83,7 @@ public:
     }
 
     // -----------------------------------------
-    const std::string& Value() const {
+    const std::string &Value() const {
         return value;
     }
 
@@ -112,7 +109,7 @@ public:
 
     // -----------------------------------------
     /** pseudo-iterator increment to advance to the next (groupcode/value) pair */
-    LineReader& operator++() {
+    LineReader &operator++() {
         if (end) {
             if (end == 1) {
                 ++end;
@@ -132,12 +129,13 @@ public:
             if (value.length() && value[0] == '{') {
 
                 size_t cnt = 0;
-                for(;splitter->length() && splitter->at(0) != '}'; splitter++, cnt++);
+                for (; splitter->length() && splitter->at(0) != '}'; splitter++, cnt++)
+                    ;
 
                 splitter++;
-                ASSIMP_LOG_VERBOSE_DEBUG("DXF: skipped over control group (",cnt," lines)");
+                ASSIMP_LOG_VERBOSE_DEBUG("DXF: skipped over control group (", cnt, " lines)");
             }
-        } catch(std::logic_error&) {
+        } catch (std::logic_error &) {
             ai_assert(!splitter);
         }
         if (!splitter) {
@@ -147,10 +145,9 @@ public:
     }
 
     // -----------------------------------------
-    LineReader& operator++(int) {
+    LineReader &operator++(int) {
         return ++(*this);
     }
-
 
     // -----------------------------------------
     operator bool() const {
@@ -166,13 +163,13 @@ private:
 
 // represents a POLYLINE or a LWPOLYLINE. or even a 3DFACE The data is converted as needed.
 struct PolyLine {
-    PolyLine()
-    : flags() {
+    PolyLine() :
+            flags() {
         // empty
     }
 
     std::vector<aiVector3D> positions;
-    std::vector<aiColor4D>  colors;
+    std::vector<aiColor4D> colors;
     std::vector<unsigned int> indices;
     std::vector<unsigned int> counts;
     unsigned int flags;
@@ -183,11 +180,8 @@ struct PolyLine {
 
 // reference to a BLOCK. Specifies its own coordinate system.
 struct InsertBlock {
-    InsertBlock()
-    : pos()
-    , scale(1.f,1.f,1.f)
-    , angle()
-    , name() {
+    InsertBlock() :
+            pos(), scale(1.f, 1.f, 1.f), angle(), name() {
         // empty
     }
 
@@ -198,25 +192,22 @@ struct InsertBlock {
     std::string name;
 };
 
-
 // keeps track of all geometry in a single BLOCK.
-struct Block
-{
-    std::vector< std::shared_ptr<PolyLine> > lines;
+struct Block {
+    std::vector<std::shared_ptr<PolyLine>> lines;
     std::vector<InsertBlock> insertions;
 
     std::string name;
     aiVector3D base;
+    bool used;
 };
 
-
-struct FileData
-{
+struct FileData {
     // note: the LAST block always contains the stuff from ENTITIES.
     std::vector<Block> blocks;
 };
 
-}
+} // namespace DXF
 } // Namespace Assimp
 
 #endif
