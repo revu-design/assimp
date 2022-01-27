@@ -114,7 +114,7 @@ private:
 
     // -----------------------------------------------------
     void ParsePolyLine(DXF::LineReader &reader,
-            DXF::FileData &output, const std::string &blockName);
+            DXF::FileData &output);
 
     // -----------------------------------------------------
     void ParsePolyLineVertex(DXF::LineReader &reader,

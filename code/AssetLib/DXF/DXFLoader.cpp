@@ -273,7 +273,7 @@ void DXFImporter::ConvertMeshes(aiScene *pScene, DXF::FileData &output) {
 
     for (auto &bl : output.blocks) {
         if (!bl.used) {
-            ASSIMP_LOG_WARN("Unused block ", bl.name);
+            ASSIMP_LOG_VERBOSE_DEBUG("Unused block ", bl.name);
         }
     }
 
@@ -377,6 +377,14 @@ void DXFImporter::ConvertMeshes(aiScene *pScene, DXF::FileData &output) {
 
 // ------------------------------------------------------------------------------------------------
 void DXFImporter::ExpandBlockReferences(DXF::Block &bl, const DXF::BlockMap &blocks_by_name) {
+    // fix up names for existing lines
+    auto addName = bl.name.size() > 0 && bl.name != AI_DXF_ENTITIES_MAGIC_BLOCK;
+    if (addName) {
+        for (auto &pl : bl.lines) {
+            pl->layer = bl.name + " : " + pl->layer;
+        }
+    }
+
     for (const DXF::InsertBlock &insert : bl.insertions) {
 
         // first check if the referenced blocks exists ...
@@ -398,18 +406,16 @@ void DXFImporter::ExpandBlockReferences(DXF::Block &bl, const DXF::BlockMap &blo
             }
 
             std::shared_ptr<DXF::PolyLine> pl_out = std::shared_ptr<DXF::PolyLine>(new DXF::PolyLine(*pl_in));
+            if (addName)
+                pl_out->layer = bl.name + " : " + pl_out->layer;
 
-            if (bl_src.base.Length() || insert.scale.x != 1.f || insert.scale.y != 1.f || insert.scale.z != 1.f || insert.angle || insert.pos.Length()) {
+            if (insert.scale.x != 1.f || insert.scale.y != 1.f || insert.scale.z != 1.f || insert.angle || insert.pos.Length()) {
                 // manual coordinate system transformation
-                // XXX order
                 aiMatrix4x4 trafo, tmp;
-                aiMatrix4x4::Translation(-bl_src.base, trafo);
+                // XXX order
                 trafo *= aiMatrix4x4::Scaling(insert.scale, tmp);
-                trafo *= aiMatrix4x4::Translation(insert.pos, tmp);
                 trafo *= aiMatrix4x4::RotationZ(insert.angle * 3.14159265359 / 180.0, tmp);
-                if (insert.angle != 0) {
-                    ASSIMP_LOG_INFO("Rotating by ", insert.angle);
-                }
+                trafo *= aiMatrix4x4::Translation(insert.pos, tmp);
 
                 for (aiVector3D &v : pl_out->positions) {
                     v *= trafo;
@@ -417,6 +423,15 @@ void DXFImporter::ExpandBlockReferences(DXF::Block &bl, const DXF::BlockMap &blo
             }
 
             bl.lines.push_back(pl_out);
+        }
+    }
+
+    // now fix up all the lines for the block base
+    if (bl.base.Length()) {
+        for (auto &pl : bl.lines) {
+            for (aiVector3D &v : pl->positions) {
+                v += bl.base;
+            }
         }
     }
 }
@@ -498,7 +513,7 @@ void DXFImporter::ParseBlocks(DXF::LineReader &reader, DXF::FileData &output) {
             ParseBlock(++reader, output);
             continue;
         } else {
-            ASSIMP_LOG_WARN("Skipping outside block ", reader.GroupCode(), " : ", reader.Value());
+            ASSIMP_LOG_VERBOSE_DEBUG("DXF: Skipping outside block ", reader.GroupCode(), " : ", reader.Value());
         }
         ++reader;
     }
@@ -515,16 +530,13 @@ void DXFImporter::ParseBlock(DXF::LineReader &reader, DXF::FileData &output) {
     while (!reader.End() && !reader.Is(0, "ENDBLK")) {
 
         if (reader.Is(0, "POLYLINE")) {
-            ParsePolyLine(++reader, output, block.name);
+            ParsePolyLine(++reader, output);
             continue;
         }
 
         // XXX is this a valid case?
         if (reader.Is(0, "INSERT")) {
-            //ASSIMP_LOG_WARN("DXF: INSERT within a BLOCK not currently supported; skipping");
             ParseInsertion(++reader, output);
-            //for (; !reader.End() && !reader.Is(0, "ENDBLK"); ++reader)
-            //    ;
             continue;
         }
 
@@ -551,7 +563,7 @@ void DXFImporter::ParseBlock(DXF::LineReader &reader, DXF::FileData &output) {
         case 0:
             break;
         default:
-            ASSIMP_LOG_WARN("Skipping in Block ", reader.GroupCode(), " : ", reader.Value());
+            ASSIMP_LOG_VERBOSE_DEBUG("DXF: Skipping in Block ", reader.GroupCode(), " : ", reader.Value());
         }
 
         ++reader;
@@ -568,7 +580,7 @@ void DXFImporter::ParseEntities(DXF::LineReader &reader, DXF::FileData &output) 
 
     while (!reader.End() && !reader.Is(0, "ENDSEC")) {
         if (reader.Is(0, "POLYLINE")) {
-            ParsePolyLine(++reader, output, block.name);
+            ParsePolyLine(++reader, output);
             continue;
         }
 
@@ -616,13 +628,13 @@ void DXFImporter::ParseInsertion(DXF::LineReader &reader, DXF::FileData &output)
 
             // scaling
         case 41:
-            bl.scale.x = reader.ValueAsFloat();
+            bl.scale.x = reader.ValueAsFloat() / 100.f;
             break;
         case 42:
-            bl.scale.y = reader.ValueAsFloat();
+            bl.scale.y = reader.ValueAsFloat() / 100.f;
             break;
         case 43:
-            bl.scale.z = reader.ValueAsFloat();
+            bl.scale.z = reader.ValueAsFloat() / 100.f;
             break;
 
             // rotation angle
@@ -640,7 +652,7 @@ void DXFImporter::ParseInsertion(DXF::LineReader &reader, DXF::FileData &output)
 #define DXF_POLYLINE_FLAG_POLYFACEMESH 0x40
 
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::ParsePolyLine(DXF::LineReader &reader, DXF::FileData &output, const std::string &blockName) {
+void DXFImporter::ParsePolyLine(DXF::LineReader &reader, DXF::FileData &output) {
     output.blocks.back().lines.push_back(std::shared_ptr<DXF::PolyLine>(new DXF::PolyLine()));
     DXF::PolyLine &line = *output.blocks.back().lines.back();
 
@@ -681,15 +693,10 @@ void DXFImporter::ParsePolyLine(DXF::LineReader &reader, DXF::FileData &output, 
             line.layer = reader.Value();
             break;
         default:
-            ASSIMP_LOG_WARN("Skipping in Polyline ", reader.GroupCode(), " : ", reader.Value());
+            ASSIMP_LOG_VERBOSE_DEBUG("DXF: Skipping in Polyline ", reader.GroupCode(), " : ", reader.Value());
         }
 
         reader++;
-    }
-
-    if (blockName.size() > 0) {
-        ASSIMP_LOG_DEBUG("Setting Polyline Name to ", blockName);
-        line.layer = blockName;
     }
 
     //if (!(line.flags & DXF_POLYLINE_FLAG_POLYFACEMESH))   {
@@ -743,8 +750,6 @@ void DXFImporter::ParsePolyLine(DXF::LineReader &reader, DXF::FileData &output, 
 
 // ------------------------------------------------------------------------------------------------
 void DXFImporter::ParsePolyLineVertex(DXF::LineReader &reader, DXF::PolyLine &line) {
-    static bool keepLogging{ false };
-    bool logNow{ keepLogging };
     bool hasNegativeVertex = false;
     unsigned int cnti = 0, flags = 0;
     unsigned int indices[4];
@@ -757,9 +762,6 @@ void DXFImporter::ParsePolyLineVertex(DXF::LineReader &reader, DXF::PolyLine &li
         if (reader.Is(0)) { // SEQEND or another VERTEX
             break;
         }
-
-        if (logNow)
-            ASSIMP_LOG_DEBUG("DXFD: GroupCode ", reader.GroupCode());
 
         switch (reader.GroupCode()) {
         case 8:
@@ -804,11 +806,8 @@ void DXFImporter::ParsePolyLineVertex(DXF::LineReader &reader, DXF::PolyLine &li
             indices[cnti++] = abs(val);
             if (val < 0) {
                 hasNegativeVertex = true;
-                ASSIMP_LOG_WARN("DXF: Ignoring negativeness (invisibility) of vertex ", val);
+                ASSIMP_LOG_VERBOSE_DEBUG("DXF: Ignoring negativeness (invisibility) of vertex ", val);
             }
-
-            if (logNow)
-                ASSIMP_LOG_DEBUG("DXFD: Index ", cnti - 1, "(", gc, ") is ", indices[cnti - 1]);
             break;
 
         // color
@@ -832,28 +831,16 @@ void DXFImporter::ParsePolyLineVertex(DXF::LineReader &reader, DXF::PolyLine &li
                 // zero marks the end of a face
                 auto new_count = i - last_count;
                 if (new_count > 0) {
-                    if (logNow)
-                        ASSIMP_LOG_DEBUG("DXF: index ", i, " is zero - marking end as ", new_count);
                     line.counts.push_back(new_count);
-                } else {
-                    keepLogging = false;
-                    if (logNow)
-                        ASSIMP_LOG_DEBUG("DXF: index ", i, " is zero - not marking end.");
                 }
                 last_count = new_count + 1; // need to skip the zero
             } else {
-                if (logNow)
-                    ASSIMP_LOG_DEBUG("DXF: index ", i, " is ", indices[i]);
                 line.indices.push_back(indices[i] - 1);
             }
         }
         if (last_count < cnti) {
-            if (logNow)
-                ASSIMP_LOG_DEBUG("DXF: marking end as ", cnti - last_count);
             line.counts.push_back(cnti - last_count);
         }
-        if (logNow)
-            ASSIMP_LOG_DEBUG("DXF: Done");
     } else {
         line.positions.push_back(out);
         line.colors.push_back(clr);
