@@ -60,6 +60,16 @@ struct Block;
 struct InsertBlock;
 
 using BlockMap = std::map<std::string, DXF::Block *>;
+
+struct ImportSettings {
+    ImportSettings() :
+            readLines(true) {
+    }
+
+    /** Read Lines - reads LINE entities rather than skipping them */
+    bool readLines;
+};
+
 } // namespace DXF
 
 // ---------------------------------------------------------------------------
@@ -83,12 +93,17 @@ protected:
      * See #BaseImporter::GetInfo for the details*/
     const aiImporterDesc *GetInfo() const override;
 
+    // --------------------
+    void SetupProperties(const Importer *pImp) override;
+
     // -------------------------------------------------------------------
     /** Imports the given file into the given scene structure.
      * See BaseImporter::InternReadFile() for details */
     void InternReadFile(const std::string &pFile, aiScene *pScene, IOSystem *pIOHandler) override;
 
 private:
+    DXF::ImportSettings settings;
+
     // -----------------------------------------------------
     void SkipSection(DXF::LineReader &reader);
 

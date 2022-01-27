@@ -142,6 +142,10 @@ const aiImporterDesc *DXFImporter::GetInfo() const {
     return &desc;
 }
 
+void DXFImporter::SetupProperties(const Importer *pImp) {
+    settings.readLines = pImp->GetPropertyBool(AI_CONFIG_IMPORT_DXF_READ_LINES, true);
+}
+
 // ------------------------------------------------------------------------------------------------
 // Imports the given file into the given scene structure.
 void DXFImporter::InternReadFile(const std::string &filename, aiScene *pScene, IOSystem *pIOHandler) {
@@ -540,9 +544,14 @@ void DXFImporter::ParseBlock(DXF::LineReader &reader, DXF::FileData &output) {
             continue;
         }
 
-        if (reader.Is(0, "3DFACE") || reader.Is(0, "LINE") || reader.Is(0, "3DLINE")) {
+        if (reader.Is(0, "3DFACE") || (settings.readLines && reader.Is(0, "LINE")) || reader.Is(0, "3DLINE")) {
             //http://sourceforge.net/tracker/index.php?func=detail&aid=2970566&group_id=226462&atid=1067632
             Parse3DFace(++reader, output);
+            continue;
+        } else if (!settings.readLines && reader.Is(0, "LINE")) {
+            ASSIMP_LOG_VERBOSE_DEBUG("DXF: Skipping in Block ", reader.GroupCode(), " : ", reader.Value());
+            for (++reader; reader.GroupCode() != 0; ++reader)
+                ;
             continue;
         }
 
@@ -589,12 +598,15 @@ void DXFImporter::ParseEntities(DXF::LineReader &reader, DXF::FileData &output) 
             continue;
         }
 
-        else if (reader.Is(0, "3DFACE") /* || reader.Is(0, "LINE") */ || reader.Is(0, "3DLINE")) {
+        else if (reader.Is(0, "3DFACE") || (settings.readLines && reader.Is(0, "LINE")) || reader.Is(0, "3DLINE")) {
             //http://sourceforge.net/tracker/index.php?func=detail&aid=2970566&group_id=226462&atid=1067632
             Parse3DFace(++reader, output);
             continue;
-        } else {
-            ASSIMP_LOG_WARN("Skipping Entity ", reader.GroupCode(), " : ", reader.Value());
+        } else if (!settings.readLines && reader.Is(0, "LINE")) {
+            ASSIMP_LOG_VERBOSE_DEBUG("DXF: Skipping Entity ", reader.GroupCode(), " : ", reader.Value());
+            for (++reader; reader.GroupCode() != 0; ++reader)
+                ;
+            continue;
         }
 
         ++reader;
