@@ -171,6 +171,7 @@ void DXFImporter::InternReadFile(const std::string &filename, aiScene *pScene, I
 
     DXF::LineReader reader(stream);
     DXF::FileData output;
+    output.defaultScale = 1.f; // set default scaling before allowing this to be changed in the header
 
     // now get all lines of the file and process top-level sections
     bool eof = false;
@@ -476,25 +477,14 @@ void DXFImporter::GenerateHierarchy(aiScene *pScene, DXF::FileData & /*output*/)
         pScene->mRootNode->mMeshes[0] = 0;
     } else {
         pScene->mRootNode->mChildren = new aiNode *[pScene->mRootNode->mNumChildren = pScene->mNumMeshes];
-        unsigned int skippedChildren = 0;
         for (unsigned int m = 0; m < pScene->mRootNode->mNumChildren; ++m) {
-            // XXX - just testing - removing problematic entities
-            if (false //pScene->mMeshes[m]->mName == aiString("A-FLOR-LEVL") //||
-                    //   pScene->mMeshes[m]->mName == aiString("A-AREA") //||
-                    //pScene->mMeshes[m]->mName == aiString("$ASSIMP_ENTITIES_MAGIC")
-            ) {
-                skippedChildren++;
-                continue;
-            }
-
-            aiNode *p = pScene->mRootNode->mChildren[m - skippedChildren] = new aiNode();
+            aiNode *p = pScene->mRootNode->mChildren[m] = new aiNode();
             p->mName = pScene->mMeshes[m]->mName;
 
             p->mMeshes = new unsigned int[p->mNumMeshes = 1];
             p->mMeshes[0] = m;
             p->mParent = pScene->mRootNode;
         }
-        pScene->mRootNode->mNumChildren -= skippedChildren;
     }
 }
 
@@ -505,9 +495,47 @@ void DXFImporter::SkipSection(DXF::LineReader &reader) {
 }
 
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::ParseHeader(DXF::LineReader &reader, DXF::FileData &) {
-    for (; !reader.End() && !reader.Is(0, "ENDSEC"); reader++)
-        ;
+void DXFImporter::ParseHeader(DXF::LineReader &reader, DXF::FileData &output) {
+    // mapping from : https://knowledge.autodesk.com/support/autocad/learn-explore/caas/CloudHelp/cloudhelp/2016/ENU/AutoCAD-Core/files/GUID-A58A87BB-482B-4042-A00A-EEF55A2B4FD8-htm.html
+    // converting to metres
+    const auto knownScales = std::map<unsigned int, float>{
+        { 1, 0.0254 }, // inches
+        { 2, 0.3048f }, // feet
+        { 3, 1609.34f }, // miles
+        { 4, 0.001f }, // millimetres
+        { 5, 0.01f }, // centimetres
+        { 6, 1.0f }, // metres
+        { 7, 1000.0f }, // kilometres
+        { 8, (float)2.54e-8 }, // microinches
+        { 9, (float)2.54e-5 }, // mils
+        { 10, 0.9144f }, // yards
+        { 11, (float)1e-10 }, // angstroms
+        { 12, (float)1e-9 }, // nanometres
+        { 13, (float)1e-6 }, // microns
+        { 14, 0.1f }, // decimetres
+        { 15, 10.0f }, // dekametres
+        { 16, 100.0f }, // hectometres
+        { 17, (float)1e9 }, // gigametres
+        { 18, (float)1.496e+11 }, // astronomical units
+        { 19, (float)9.461e+15 }, // light years
+        { 20, (float)3.086e+16 }, // parsecs
+    };
+
+    for (; !reader.End() && !reader.Is(0, "ENDSEC"); reader++) {
+        if (reader.Is(9, "$INSUNITS")) {
+            reader++;
+            if (reader.Is(70)) {
+                unsigned int unitCode = reader.ValueAsUnsignedInt();
+                auto scaleI = knownScales.find(unitCode);
+                if (scaleI != knownScales.end()) {
+                    output.defaultScale = scaleI->second;
+                    ASSIMP_LOG_INFO("DXF: Setting scale to ", scaleI->second);
+                } else {
+                    ASSIMP_LOG_WARN("DXF: unknown scale code ", unitCode);
+                }
+            }
+        }
+    }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -561,13 +589,13 @@ void DXFImporter::ParseBlock(DXF::LineReader &reader, DXF::FileData &output) {
             break;
 
         case GroupCode_XComp:
-            block.base.x = reader.ValueAsFloat();
+            block.base.x = reader.ValueAsFloat() * output.defaultScale;
             break;
         case GroupCode_YComp:
-            block.base.y = reader.ValueAsFloat();
+            block.base.y = reader.ValueAsFloat() * output.defaultScale;
             break;
         case GroupCode_ZComp:
-            block.base.z = reader.ValueAsFloat();
+            block.base.z = reader.ValueAsFloat() * output.defaultScale;
             break;
         case 0:
             break;
@@ -629,24 +657,24 @@ void DXFImporter::ParseInsertion(DXF::LineReader &reader, DXF::FileData &output)
 
             // translation
         case GroupCode_XComp:
-            bl.pos.x = reader.ValueAsFloat();
+            bl.pos.x = reader.ValueAsFloat() * output.defaultScale;
             break;
         case GroupCode_YComp:
-            bl.pos.y = reader.ValueAsFloat();
+            bl.pos.y = reader.ValueAsFloat() * output.defaultScale;
             break;
         case GroupCode_ZComp:
-            bl.pos.z = reader.ValueAsFloat();
+            bl.pos.z = reader.ValueAsFloat() * output.defaultScale;
             break;
 
             // scaling
         case 41:
-            bl.scale.x = reader.ValueAsFloat() / 100.f;
+            bl.scale.x = reader.ValueAsFloat();
             break;
         case 42:
-            bl.scale.y = reader.ValueAsFloat() / 100.f;
+            bl.scale.y = reader.ValueAsFloat();
             break;
         case 43:
-            bl.scale.z = reader.ValueAsFloat() / 100.f;
+            bl.scale.z = reader.ValueAsFloat();
             break;
 
             // rotation angle
@@ -672,7 +700,7 @@ void DXFImporter::ParsePolyLine(DXF::LineReader &reader, DXF::FileData &output) 
     while (!reader.End() && !reader.Is(0, "ENDSEC")) {
 
         if (reader.Is(0, "VERTEX")) {
-            ParsePolyLineVertex(++reader, line);
+            ParsePolyLineVertex(++reader, line, output.defaultScale);
             if (reader.Is(0, "SEQEND")) {
                 break;
             }
@@ -710,12 +738,6 @@ void DXFImporter::ParsePolyLine(DXF::LineReader &reader, DXF::FileData &output) 
 
         reader++;
     }
-
-    //if (!(line.flags & DXF_POLYLINE_FLAG_POLYFACEMESH))   {
-    //  DefaultLogger::get()->warn((Formatter::format("DXF: polyline not currently supported: "),line.flags));
-    //  output.blocks.back().lines.pop_back();
-    //  return;
-    //}
 
     if (vguess && line.positions.size() != vguess) {
         ASSIMP_LOG_WARN("DXF: unexpected vertex count in polymesh: ",
@@ -761,7 +783,7 @@ void DXFImporter::ParsePolyLine(DXF::LineReader &reader, DXF::FileData &output) 
 #define DXF_VERTEX_FLAG_HAS_POSITIONS 0x40
 
 // ------------------------------------------------------------------------------------------------
-void DXFImporter::ParsePolyLineVertex(DXF::LineReader &reader, DXF::PolyLine &line) {
+void DXFImporter::ParsePolyLineVertex(DXF::LineReader &reader, DXF::PolyLine &line, float scale) {
     bool hasNegativeVertex = false;
     unsigned int cnti = 0, flags = 0;
     unsigned int indices[4];
@@ -791,15 +813,15 @@ void DXFImporter::ParsePolyLineVertex(DXF::LineReader &reader, DXF::PolyLine &li
 
         // VERTEX COORDINATES
         case GroupCode_XComp:
-            out.x = reader.ValueAsFloat();
+            out.x = reader.ValueAsFloat() * scale;
             break;
 
         case GroupCode_YComp:
-            out.y = reader.ValueAsFloat();
+            out.y = reader.ValueAsFloat() * scale;
             break;
 
         case GroupCode_ZComp:
-            out.z = reader.ValueAsFloat();
+            out.z = reader.ValueAsFloat() * scale;
             break;
 
         // POLYFACE vertex indices
@@ -886,73 +908,73 @@ void DXFImporter::Parse3DFace(DXF::LineReader &reader, DXF::FileData &output) {
 
         // x position of the first corner
         case 10:
-            vip[0].x = reader.ValueAsFloat();
+            vip[0].x = reader.ValueAsFloat() * output.defaultScale;
             b[2] = true;
             break;
 
         // y position of the first corner
         case 20:
-            vip[0].y = reader.ValueAsFloat();
+            vip[0].y = reader.ValueAsFloat() * output.defaultScale;
             b[2] = true;
             break;
 
         // z position of the first corner
         case 30:
-            vip[0].z = reader.ValueAsFloat();
+            vip[0].z = reader.ValueAsFloat() * output.defaultScale;
             b[2] = true;
             break;
 
         // x position of the second corner
         case 11:
-            vip[1].x = reader.ValueAsFloat();
+            vip[1].x = reader.ValueAsFloat() * output.defaultScale;
             b[3] = true;
             break;
 
         // y position of the second corner
         case 21:
-            vip[1].y = reader.ValueAsFloat();
+            vip[1].y = reader.ValueAsFloat() * output.defaultScale;
             b[3] = true;
             break;
 
         // z position of the second corner
         case 31:
-            vip[1].z = reader.ValueAsFloat();
+            vip[1].z = reader.ValueAsFloat() * output.defaultScale;
             b[3] = true;
             break;
 
         // x position of the third corner
         case 12:
-            vip[2].x = reader.ValueAsFloat();
+            vip[2].x = reader.ValueAsFloat() * output.defaultScale;
             b[0] = true;
             break;
 
         // y position of the third corner
         case 22:
-            vip[2].y = reader.ValueAsFloat();
+            vip[2].y = reader.ValueAsFloat() * output.defaultScale;
             b[0] = true;
             break;
 
         // z position of the third corner
         case 32:
-            vip[2].z = reader.ValueAsFloat();
+            vip[2].z = reader.ValueAsFloat() * output.defaultScale;
             b[0] = true;
             break;
 
         // x position of the fourth corner
         case 13:
-            vip[3].x = reader.ValueAsFloat();
+            vip[3].x = reader.ValueAsFloat() * output.defaultScale;
             b[1] = true;
             break;
 
         // y position of the fourth corner
         case 23:
-            vip[3].y = reader.ValueAsFloat();
+            vip[3].y = reader.ValueAsFloat() * output.defaultScale;
             b[1] = true;
             break;
 
         // z position of the fourth corner
         case 33:
-            vip[3].z = reader.ValueAsFloat();
+            vip[3].z = reader.ValueAsFloat() * output.defaultScale;
             b[1] = true;
             break;
 

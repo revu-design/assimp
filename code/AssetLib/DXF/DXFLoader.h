@@ -133,7 +133,7 @@ private:
 
     // -----------------------------------------------------
     void ParsePolyLineVertex(DXF::LineReader &reader,
-            DXF::PolyLine &line);
+            DXF::PolyLine &line, float scale);
 
     // -----------------------------------------------------
     void Parse3DFace(DXF::LineReader &reader,

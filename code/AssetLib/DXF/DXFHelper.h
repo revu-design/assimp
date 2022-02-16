@@ -203,6 +203,7 @@ struct Block {
 };
 
 struct FileData {
+    float defaultScale; // default scale for reading positions and sizes
     // note: the LAST block always contains the stuff from ENTITIES.
     std::vector<Block> blocks;
 };
